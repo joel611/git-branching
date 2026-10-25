@@ -1,0 +1,653 @@
+<title>Git Branching for Agents</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow reading column; each model is a stepper whose git graph redraws as you advance. */
+:root {
+  --bg: #f3f6f8;
+  --surface: #ffffff;
+  --ink: #13202b;
+  --muted: #546675;
+  --line: #d6dee5;
+  --accent: #0e7c74;
+  --accent-soft: #dcf1ee;
+  --code-bg: #0f1b24;
+  --code-ink: #d7e3ea;
+  --good: #1b7f4b;
+  --bad: #b3372d;
+  --pill-ink: #ffffff;
+  --c-main: #0e7c74;
+  --c-uat: #a8690f;
+  --c-rel: #7c4dd8;
+  --c-t1: #2b6be0;
+  --c-t2: #cc3a78;
+  --c-t3: #c4551a;
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d151c; --surface: #15202a; --ink: #e6eef3; --muted: #93a6b4; --line: #26343f;
+    --accent: #3fc1b5; --accent-soft: #11332f; --code-bg: #081016; --code-ink: #d7e3ea;
+    --good: #5ccf93; --bad: #f08075; --pill-ink: #0d151c;
+    --c-main: #3fc1b5; --c-uat: #e5a93d; --c-rel: #a98af0; --c-t1: #6a9cff; --c-t2: #f06ba0; --c-t3: #f08a4b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0d151c; --surface: #15202a; --ink: #e6eef3; --muted: #93a6b4; --line: #26343f;
+  --accent: #3fc1b5; --accent-soft: #11332f; --code-bg: #081016; --code-ink: #d7e3ea;
+  --good: #5ccf93; --bad: #f08075; --pill-ink: #0d151c;
+  --c-main: #3fc1b5; --c-uat: #e5a93d; --c-rel: #a98af0; --c-t1: #6a9cff; --c-t2: #f06ba0; --c-t3: #f08a4b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 16px/1.6 var(--f-body);
+  padding-block: 0 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
+.wrap { max-width: 880px; margin: 0 auto; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; line-height: 1.12; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; }
+h2 { font-size: clamp(1.6rem, 3.6vw, 2.2rem); font-weight: 700; }
+h3 { font-size: 1.2rem; font-weight: 700; }
+p { margin: 0; }
+code, pre, .mono { font-family: var(--f-mono); }
+code { font-size: .86em; background: var(--accent-soft); padding: .1em .4em; border-radius: 4px; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+nav.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+  margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  padding-inline: max(16px, env(safe-area-inset-left, 0px));
+}
+nav.top .in { max-width: 880px; margin: 0 auto; display: flex; gap: 4px; overflow-x: auto; padding-block: 8px; }
+nav.top a {
+  white-space: nowrap; text-decoration: none; color: var(--muted); font-size: .88rem; font-weight: 500;
+  padding: 6px 12px; border-radius: 999px;
+}
+nav.top a:hover { color: var(--ink); background: var(--surface); }
+
+header.hero { padding-block: 56px 40px; display: grid; gap: 20px; }
+.eyebrow { font: 600 .75rem/1 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.lede { font-size: 1.15rem; color: var(--muted); max-width: 60ch; }
+.hero .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; font: 500 .9rem var(--f-body); padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); text-decoration: none; color: var(--ink); }
+.chip i { width: 10px; height: 10px; border-radius: 50%; display: block; }
+
+section { padding-block: 48px 8px; display: grid; gap: 22px; }
+section > .intro { display: grid; gap: 10px; }
+section > .intro p { color: var(--muted); max-width: 64ch; }
+
+.principles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px 28px; }
+.principles > div { border-top: 2px solid var(--ink); padding-top: 12px; display: grid; gap: 6px; align-content: start; }
+.principles h3 { font-size: 1.02rem; }
+.principles p { color: var(--muted); font-size: .94rem; }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.pad { padding: 20px; }
+
+/* worktree demo */
+.wt { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 0; }
+.wt > div { padding: 20px; min-width: 0; display: grid; gap: 14px; align-content: start; }
+.wt > div + div { border-left: 1px solid var(--line); }
+.btnrow { display: flex; flex-wrap: wrap; gap: 8px; }
+button, .btn {
+  font: 500 .92rem var(--f-body); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; min-height: 38px;
+}
+button:hover:not(:disabled) { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--pill-ink); font-weight: 600; }
+button:disabled { opacity: .4; cursor: default; }
+.tree { background: var(--code-bg); color: var(--code-ink); border-radius: 8px; padding: 14px 16px; font-size: .82rem; line-height: 1.7; overflow-x: auto; margin: 0; white-space: pre; }
+.tree .dim { opacity: .55; }
+.tree b { font-weight: 600; }
+.small { font-size: .9rem; color: var(--muted); }
+
+/* labs */
+.lab { overflow: hidden; }
+.lab-top { padding: 14px 20px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; }
+.lab-top fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; min-width: 0; }
+.lab-top legend { float: left; padding: 0; margin-right: 6px; font: 600 .72rem var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.lab-top label { display: inline-flex; gap: 6px; align-items: center; font-size: .9rem; cursor: pointer; }
+.lab-top input { accent-color: var(--accent); width: 16px; height: 16px; }
+.stage { position: relative; background: var(--bg); border-bottom: 1px solid var(--line); }
+.lanes { position: absolute; left: 0; top: 0; width: 140px; z-index: 2; pointer-events: none; }
+.lane-label { position: absolute; left: 10px; width: 130px; display: flex; align-items: center; gap: 6px; font: 500 10.5px/1.2 var(--f-mono); height: 20px; background: var(--bg); }
+.lane-label i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.lane-label span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane-label.done { color: var(--muted); }
+.lane-label.done span { text-decoration: line-through; text-decoration-thickness: 1px; }
+.lane-label em { font-style: normal; color: var(--good); font-size: 10px; }
+.scroller { margin-left: 140px; overflow-x: auto; }
+.scroller svg { display: block; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 10px 20px; font-size: .78rem; color: var(--muted); border-bottom: 1px solid var(--line); }
+.legend span { display: inline-flex; gap: 6px; align-items: center; }
+.legend svg { width: 26px; height: 10px; }
+.stepbody { padding: 22px 20px 8px; display: grid; gap: 12px; min-height: 250px; align-content: start; }
+.kicker { font: 600 .72rem var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.stepbody p { max-width: 66ch; }
+.stepbody p.note { font-size: .92rem; color: var(--muted); border-left: 3px solid var(--line); padding-left: 12px; }
+.stepbody p.warn { color: var(--bad); }
+.cmd { position: relative; background: var(--code-bg); border-radius: 8px; }
+.cmd pre { margin: 0; padding: 14px 70px 14px 16px; overflow-x: auto; font-size: .82rem; line-height: 1.65; color: var(--code-ink); }
+.cmd button { position: absolute; top: 8px; right: 8px; min-height: 0; padding: 4px 10px; font-size: .75rem; background: transparent; color: var(--code-ink); border-color: #ffffff33; }
+.stepnav { display: flex; align-items: center; gap: 12px; padding: 14px 20px 20px; flex-wrap: wrap; }
+.dots { display: flex; gap: 6px; flex: 1; justify-content: center; flex-wrap: wrap; min-width: 120px; }
+.dots button { width: 12px; height: 12px; min-height: 0; padding: 0; border-radius: 50%; border: 2px solid var(--line); background: transparent; }
+.dots button.on { background: var(--accent); border-color: var(--accent); }
+.dots button.past { border-color: var(--accent); }
+
+/* svg graph */
+.edge { fill: none; stroke-width: 2.5; }
+.node-c { fill: var(--surface); stroke-width: 2.5; }
+.node-f { fill: var(--bg); stroke-width: 2; }
+.node-t { font: 600 9px var(--f-mono); fill: var(--ink); text-anchor: middle; dominant-baseline: central; }
+.pill-t { font: 600 9.5px var(--f-mono); fill: var(--pill-ink); text-anchor: middle; dominant-baseline: central; }
+.halo { fill: none; stroke-width: 3; opacity: .35; }
+@keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.fresh { transform-box: fill-box; transform-origin: center; animation: pop .35s ease-out; }
+@media (prefers-reduced-motion: reduce) { .fresh { animation: none; } html { scroll-behavior: auto; } }
+
+/* compare */
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .92rem; }
+th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 .72rem var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); background: var(--bg); }
+th.c1 { color: var(--c-main); } th.c2 { color: var(--c-rel); }
+tbody th { text-transform: none; letter-spacing: 0; font: 600 .9rem var(--f-body); color: var(--ink); background: transparent; width: 26%; }
+tbody tr:hover { background: var(--accent-soft); }
+.rule { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.rule .panel { padding: 18px 20px; display: grid; gap: 6px; }
+.rule .panel p { color: var(--muted); font-size: .94rem; }
+
+/* quiz */
+.quiz { padding: 24px 20px; display: grid; gap: 16px; }
+.qmeta { display: flex; justify-content: space-between; gap: 12px; font: 600 .75rem var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.bar { height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.bar > div { height: 100%; background: var(--accent); width: 0; transition: width .3s; }
+.opts { display: grid; gap: 8px; }
+.opts button { text-align: left; padding: 12px 14px; line-height: 1.4; }
+.opts button.right { border-color: var(--good); background: color-mix(in srgb, var(--good) 14%, var(--surface)); }
+.opts button.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, var(--surface)); }
+.fb { padding: 12px 14px; border-radius: 8px; background: var(--bg); font-size: .94rem; }
+.score { font-family: var(--f-display); font-size: 2.6rem; font-weight: 700; }
+
+footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
+
+@media (max-width: 640px) {
+  .wt { grid-template-columns: minmax(0, 1fr); }
+  .wt > div + div { border-left: 0; border-top: 1px solid var(--line); }
+  .lanes { width: 104px; } .scroller { margin-left: 104px; }
+  .lane-label { width: 98px; font-size: 9.5px; left: 6px; }
+  header.hero { padding-block: 36px 24px; }
+}
+</style>
+
+<div class="wrap">
+  <nav class="top" aria-label="Lesson sections"><div class="in">
+    <a href="#foundation">Foundation</a>
+    <a href="#trunk">Trunk-based</a>
+    <a href="#selective">Selective promotion</a>
+    <a href="#compare">Compare</a>
+    <a href="#quiz">Quiz</a>
+  </div></nav>
+
+  <header class="hero">
+    <p class="eyebrow">Interactive lesson</p>
+    <h1>Branching strategies when agents write the code</h1>
+    <p class="lede">Many AI agents work in parallel, each on its own ticket, and every change goes through a pull request. Two branching models handle that well. You will step through both, build a release yourself, and finish with a short quiz.</p>
+    <div class="chips">
+      <a class="chip" href="#trunk"><i style="background:var(--c-main)"></i>Trunk-based: internal products, ship constantly</a>
+      <a class="chip" href="#selective"><i style="background:var(--c-rel)"></i>Selective promotion: client work, partial releases</a>
+    </div>
+  </header>
+
+  <section id="foundation">
+    <div class="intro">
+      <p class="eyebrow">Shared foundation</p>
+      <h2>Four habits both models rely on</h2>
+      <p>The models differ in where work is integrated. The way each ticket is isolated and landed is the same.</p>
+    </div>
+    <div class="principles">
+      <div><h3>One worktree, one branch per ticket</h3><p>Each agent gets its own folder on disk, so parallel agents never overwrite each other's files.</p></div>
+      <div><h3>Short-lived ticket branches</h3><p>A branch exists to land one ticket. The longer it lives, the more it drifts from its base.</p></div>
+      <div><h3>Pull requests are the gate</h3><p>CI and review run on the PR. Nothing reaches a shared branch without passing it.</p></div>
+      <div><h3>Squash merge agent work</h3><p>Agents commit exploratory steps. A squash turns them into one readable commit per ticket.</p></div>
+    </div>
+
+    <div class="panel wt">
+      <div>
+        <h3>Try it: add agents</h3>
+        <p class="small">Each agent gets a worktree created from <code>origin/main</code>. Add a few and watch the folders appear.</p>
+        <div class="btnrow">
+          <button class="primary" id="wt-add">Add an agent</button>
+          <button id="wt-remove">Remove last</button>
+        </div>
+        <p class="small" id="wt-note"></p>
+      </div>
+      <div>
+        <pre class="tree" id="wt-tree" aria-live="polite"></pre>
+        <div class="cmd"><pre id="wt-cmd"></pre><button type="button" data-copy="wt-cmd">Copy</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="trunk">
+    <div class="intro">
+      <p class="eyebrow" style="color:var(--c-main)">Model 1</p>
+      <h2>Trunk-based development</h2>
+      <p>Use it for internal products and services that deploy several times a day. There is one long-lived branch, <code>main</code>, and it must always be releasable. Every ticket lives on a branch for hours, or two days at most, then lands on <code>main</code>. Unfinished features hide behind feature flags. There is no <code>develop</code> or <code>uat</code> branch.</p>
+    </div>
+    <div class="panel lab" id="lab-trunk"></div>
+  </section>
+
+  <section id="selective">
+    <div class="intro">
+      <p class="eyebrow" style="color:var(--c-rel)">Model 2</p>
+      <h2>Selective promotion</h2>
+      <p>Use it for client work where each ticket has its own branch, tickets are tested together on UAT, and the client may release only some of them. The final pull request must still land on <code>main</code>.</p>
+      <p>At release time the person in charge cuts a fresh <code>release/*</code> branch from <code>main</code>, squash-merges only the approved tickets into it, and opens one PR to <code>main</code>. Choose which tickets the client approved, then step through.</p>
+    </div>
+    <div class="panel lab" id="lab-sel"></div>
+    <div class="panel pad" style="display:grid;gap:10px">
+      <h3>Why a release branch beats separate PRs</h3>
+      <p class="small">Compare the two modes above using the same approved tickets. With a release branch, conflicts between tickets are resolved once, in one place, and <code>main</code> gets exactly one clean commit per approved ticket. With separate PRs, each ticket must be rebased onto the result of the one before it, and the conflicts are resolved on <code>main</code> itself, one at a time.</p>
+    </div>
+  </section>
+
+  <section id="compare">
+    <div class="intro">
+      <p class="eyebrow">Side by side</p>
+      <h2>Choose by project constraints</h2>
+      <p>Classic Git Flow, with long-lived <code>develop</code>, release and hotfix branches, adds too much overhead and merge pain when many agents produce changes at once. These two models keep the useful parts and drop the rest.</p>
+    </div>
+    <div class="panel tablewrap">
+      <table>
+        <thead><tr><th></th><th class="c1">Trunk-based</th><th class="c2">Selective promotion</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Long-lived branches</th><td>Only <code>main</code></td><td><code>main</code> and <code>uat</code>, plus temporary <code>release/*</code></td></tr>
+          <tr><th scope="row">Ticket branch lifetime</th><td>Hours to 1–2 days</td><td>Days, until the release decision</td></tr>
+          <tr><th scope="row">Integration point</th><td>Straight into <code>main</code></td><td>Into <code>uat</code> first, later via release → <code>main</code></td></tr>
+          <tr><th scope="row">Partial release</th><td>Feature flags</td><td>Explicit: pick which ticket branches ship</td></tr>
+          <tr><th scope="row">Final landing on main</th><td>Direct PR from the ticket</td><td>One PR from the release branch</td></tr>
+          <tr><th scope="row">Commits on main</th><td>One squash per ticket</td><td>One squash per selected ticket</td></tr>
+          <tr><th scope="row">Deployment</th><td>Continuous, many per day</td><td>Scheduled batches</td></tr>
+          <tr><th scope="row">Conflict risk</th><td>Low, branches are short</td><td>Concentrated on the release branch</td></tr>
+          <tr><th scope="row">Agents and worktrees</th><td>Excellent</td><td>Excellent, same isolation model</td></tr>
+          <tr><th scope="row">Best for</th><td>Internal products, high velocity</td><td>Client contracts with change control</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="rule">
+      <div class="panel"><h3>Pick trunk-based when</h3><p>You own the product, deploy often, and can hide unfinished work behind flags.</p></div>
+      <div class="panel"><h3>Pick selective promotion when</h3><p>A client tests on UAT and can approve some tickets while rejecting others.</p></div>
+    </div>
+    <p class="small">Both keep ticket branches current by rebasing or merging from their base while they are active, use consistent names such as <code>ticket/&lt;id&gt;-short-desc</code>, and automate worktree creation and cleanup.</p>
+  </section>
+
+  <section id="quiz">
+    <div class="intro">
+      <p class="eyebrow">Check yourself</p>
+      <h2>Seven questions</h2>
+    </div>
+    <div class="panel quiz" id="quiz-box"></div>
+  </section>
+
+  <footer>Based on the team notes “Git Branching Strategies for Agentic Development”.</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- copy helper ---------- */
+  function copyFrom(pre, btn) {
+    var text = pre.textContent;
+    var done = function () { var o = btn.textContent; btn.textContent = "Copied"; setTimeout(function () { btn.textContent = o; }, 1200); };
+    var fallback = function () {
+      var r = document.createRange(); r.selectNodeContents(pre);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+    };
+    try { navigator.clipboard.writeText(text).then(done, fallback); } catch (e) { fallback(); }
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-copy]");
+    if (b) copyFrom(document.getElementById(b.getAttribute("data-copy")), b);
+  });
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+  /* ---------- worktree demo ---------- */
+  var AGENTS = [["101", "login"], ["102", "api"], ["103", "ui"], ["104", "search"]];
+  var nAgents = 1;
+  function renderWt() {
+    var tree = "<b>repo/</b>  <span class='dim'>main checkout, stays on main</span>\n<b>worktrees/</b>\n";
+    var cmds = [];
+    for (var i = 0; i < nAgents; i++) {
+      var a = AGENTS[i];
+      var last = i === nAgents - 1;
+      tree += (last ? "  └─ " : "  ├─ ") + "<b>" + a[0] + "/</b>  ticket/" + a[0] + "-" + a[1] + "  <span class='dim'>← agent " + (i + 1) + "</span>\n";
+      cmds.push("git worktree add -b ticket/" + a[0] + "-" + a[1] + " ../worktrees/" + a[0] + " origin/main");
+    }
+    document.getElementById("wt-tree").innerHTML = tree;
+    document.getElementById("wt-cmd").textContent = cmds.join("\n");
+    document.getElementById("wt-add").disabled = nAgents >= AGENTS.length;
+    document.getElementById("wt-remove").disabled = nAgents <= 1;
+    document.getElementById("wt-note").textContent = nAgents + (nAgents === 1 ? " agent" : " agents") +
+      ", " + nAgents + (nAgents === 1 ? " folder" : " folders") + ", one shared git history. Edits in one folder never touch another.";
+  }
+  document.getElementById("wt-add").addEventListener("click", function () { if (nAgents < AGENTS.length) { nAgents++; renderWt(); } });
+  document.getElementById("wt-remove").addEventListener("click", function () { if (nAgents > 1) { nAgents--; renderWt(); } });
+  renderWt();
+
+  /* ---------- git graph engine ---------- */
+  var DX = 80, DY = 56, X0 = 34, Y0 = 46, R = 12;
+  var TICKET_COLORS = ["t1", "t2", "t3"];
+
+  function build(ops) {
+    var lanes = [], laneOf = {}, tip = {}, nodes = [], edges = [], tcount = 0;
+    function ensure(name) {
+      if (name in laneOf) return;
+      var color = name === "main" ? "main" : name === "uat" ? "uat" : name.indexOf("release") === 0 ? "rel" : TICKET_COLORS[tcount++ % 3];
+      laneOf[name] = lanes.length;
+      lanes.push({ name: name, color: color, deleted: false, note: "" });
+    }
+    ops.forEach(function (op) {
+      var n;
+      if (op.t === "branch") {
+        ensure(op.name);
+        n = { kind: "fork", lane: laneOf[op.name], step: op.s, color: lanes[laneOf[op.name]].color };
+        nodes.push(n); edges.push({ a: tip[op.from], b: n, color: n.color, out: true }); tip[op.name] = n;
+      } else if (op.t === "commit") {
+        ensure(op.b);
+        n = { kind: "commit", id: op.id, tag: op.tag, lane: laneOf[op.b], step: op.s, color: lanes[laneOf[op.b]].color };
+        nodes.push(n); if (tip[op.b]) edges.push({ a: tip[op.b], b: n, color: n.color }); tip[op.b] = n;
+      } else if (op.t === "merge") {
+        ensure(op.into);
+        n = { kind: "commit", id: op.id, tag: op.tag, lane: laneOf[op.into], step: op.s, color: lanes[laneOf[op.into]].color, warn: op.warn };
+        nodes.push(n);
+        edges.push({ a: tip[op.into], b: n, color: n.color });
+        edges.push({ a: tip[op.from], b: n, color: lanes[laneOf[op.from]].color, dashed: !!op.squash });
+        tip[op.into] = n;
+      } else if (op.t === "delete") {
+        var l = lanes[laneOf[op.b]]; l.deleted = true; l.note = op.note || "merged";
+      }
+    });
+    nodes.forEach(function (n, i) { n.x = X0 + i * DX; n.y = Y0 + n.lane * DY; });
+    return { lanes: lanes, nodes: nodes, edges: edges };
+  }
+
+  function colorVar(c) { return "var(--c-" + c + ")"; }
+
+  function drawGraph(g, current, stage) {
+    var lanesEl = stage.querySelector(".lanes"), scroller = stage.querySelector(".scroller");
+    var h = Y0 + (g.lanes.length - 1) * DY + 30;
+    var w = Math.max(g.nodes.length * DX + X0 + 24, 320);
+    var s = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + " " + h + '" role="img" aria-label="Git commit graph">';
+    g.lanes.forEach(function (l, i) {
+      var y = Y0 + i * DY;
+      s += '<line x1="0" x2="' + w + '" y1="' + y + '" y2="' + y + '" stroke="var(--line)" stroke-dasharray="2 6"/>';
+    });
+    g.edges.forEach(function (e) {
+      var a = e.a, b = e.b;
+      if (!a) return;
+      var d;
+      if (a.y === b.y) d = "M" + a.x + " " + a.y + " L" + b.x + " " + b.y;
+      else if (e.out) { var k1 = a.x + 36; d = "M" + a.x + " " + a.y + " C" + (a.x + 22) + " " + a.y + " " + (a.x + 14) + " " + b.y + " " + k1 + " " + b.y + " L" + b.x + " " + b.y; }
+      else { var k2 = b.x - 36; d = "M" + a.x + " " + a.y + " L" + k2 + " " + a.y + " C" + (k2 + 22) + " " + a.y + " " + (k2 + 14) + " " + b.y + " " + b.x + " " + b.y; }
+      s += '<path class="edge" d="' + d + '" stroke="' + colorVar(e.color) + '"' + (e.dashed ? ' stroke-dasharray="6 5"' : "") + "/>";
+    });
+    g.nodes.forEach(function (n) {
+      var fresh = n.step === current, cls = fresh ? ' class="fresh"' : "";
+      if (n.kind === "fork") {
+        s += '<g' + cls + '><circle class="node-f" cx="' + n.x + '" cy="' + n.y + '" r="6" stroke="' + colorVar(n.color) + '"/></g>';
+        return;
+      }
+      s += "<g" + cls + ">";
+      if (fresh) s += '<circle class="halo" cx="' + n.x + '" cy="' + n.y + '" r="' + (R + 5) + '" stroke="' + colorVar(n.color) + '"/>';
+      s += '<circle class="node-c" cx="' + n.x + '" cy="' + n.y + '" r="' + R + '" stroke="' + colorVar(n.color) + '"/>';
+      s += '<text class="node-t" x="' + n.x + '" y="' + n.y + '">' + esc(n.id) + "</text>";
+      if (n.tag) {
+        var tw = n.tag.length * 5.9 + 14;
+        s += '<rect x="' + (n.x - tw / 2) + '" y="' + (n.y - 36) + '" width="' + tw + '" height="17" rx="8.5" fill="' + (n.warn ? "var(--bad)" : colorVar(n.color)) + '"/>';
+        s += '<text class="pill-t" x="' + n.x + '" y="' + (n.y - 27.5) + '">' + esc(n.tag) + "</text>";
+      }
+      s += "</g>";
+    });
+    s += "</svg>";
+    scroller.innerHTML = s;
+    lanesEl.style.height = h + "px";
+    lanesEl.innerHTML = g.lanes.map(function (l, i) {
+      return '<div class="lane-label' + (l.deleted ? " done" : "") + '" style="top:' + (Y0 + i * DY - 10) + 'px"><i style="background:' + colorVar(l.color) + '"></i><span title="' + esc(l.name) + '">' + esc(l.name) + "</span>" + (l.deleted ? "<em>✓</em>" : "") + "</div>";
+    }).join("");
+    var last = g.nodes.filter(function (n) { return n.step === current; }).pop();
+    if (last) scroller.scrollLeft = Math.max(0, last.x - scroller.clientWidth / 2);
+  }
+
+  /* ---------- stepper lab ---------- */
+  function Lab(root, cfg) {
+    var i = 0;
+    root.innerHTML =
+      (cfg.controls ? '<div class="lab-top">' + cfg.controls + "</div>" : "") +
+      '<div class="stage"><div class="lanes"></div><div class="scroller"></div></div>' +
+      '<div class="legend">' +
+      '<span><svg viewBox="0 0 26 10"><path d="M0 5H26" stroke="var(--ink)" stroke-width="2.5"/></svg>parent link</span>' +
+      '<span><svg viewBox="0 0 26 10"><path d="M0 5H26" stroke="var(--ink)" stroke-width="2.5" stroke-dasharray="6 5"/></svg>squashed in (contents copied, no parent link)</span>' +
+      '<span><svg viewBox="0 0 26 10"><circle cx="13" cy="5" r="4" fill="var(--bg)" stroke="var(--ink)" stroke-width="2"/></svg>branch created</span></div>' +
+      '<div class="stepbody"></div>' +
+      '<div class="stepnav"><button class="back">Back</button><div class="dots" role="group" aria-label="Steps"></div><button class="primary next">Next step</button></div>';
+    var stage = root.querySelector(".stage"), body = root.querySelector(".stepbody");
+    var dots = root.querySelector(".dots"), back = root.querySelector(".back"), next = root.querySelector(".next");
+    var api = {
+      reset: function (to) { i = to || 0; api.render(); },
+      render: function () {
+        var steps = cfg.steps();
+        if (i >= steps.length) i = steps.length - 1;
+        var ops = [];
+        for (var k = 0; k <= i; k++) steps[k].ops.forEach(function (o) { var c = {}; for (var p in o) c[p] = o[p]; c.s = k; ops.push(c); });
+        drawGraph(build(ops), i, stage);
+        var st = steps[i];
+        body.innerHTML = '<p class="kicker">Step ' + (i + 1) + " of " + steps.length + "</p><h3>" + esc(st.title) + "</h3><p>" + st.text + "</p>" +
+          (st.cmd ? '<div class="cmd"><pre>' + esc(st.cmd) + '</pre><button type="button" class="cp">Copy</button></div>' : "") +
+          (st.note ? '<p class="note">' + st.note + "</p>" : "") +
+          (st.warn ? '<p class="warn">' + st.warn + "</p>" : "");
+        var cp = body.querySelector(".cp");
+        if (cp) cp.addEventListener("click", function () { copyFrom(body.querySelector(".cmd pre"), cp); });
+        dots.innerHTML = steps.map(function (_, k) {
+          return '<button aria-label="Go to step ' + (k + 1) + '" class="' + (k === i ? "on" : k < i ? "past" : "") + '" data-k="' + k + '"></button>';
+        }).join("");
+        back.disabled = i === 0;
+        next.disabled = i === steps.length - 1;
+        next.textContent = i === steps.length - 1 ? "Done" : "Next step";
+      }
+    };
+    back.addEventListener("click", function () { if (i > 0) { i--; api.render(); } });
+    next.addEventListener("click", function () { i++; api.render(); });
+    dots.addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) { i = +b.getAttribute("data-k"); api.render(); } });
+    api.render();
+    return api;
+  }
+
+  /* ---------- trunk steps ---------- */
+  var T101 = "ticket/101-login", T102 = "ticket/102-api", T103 = "ticket/103-ui";
+  var trunkSteps = [
+    { title: "main is the only long-lived branch", text: "It must always be releasable. Anything on <code>main</code> could be deployed right now.",
+      ops: [{ t: "commit", b: "main", id: "A", tag: "always releasable" }] },
+    { title: "Give the agent its own worktree and branch", text: "Always branch from the latest <code>main</code>. The new folder is where the agent works, and nowhere else.",
+      cmd: "git worktree add -b " + T101 + " ../worktrees/101 origin/main",
+      ops: [{ t: "branch", name: T101, from: "main" }] },
+    { title: "The agent commits freely inside its worktree", text: "Agents tend to commit in many small, exploratory steps. That is fine, because the squash at the end will hide them.",
+      ops: [{ t: "commit", b: T101, id: "B" }, { t: "commit", b: T101, id: "C" }] },
+    { title: "Rebase onto main, push, open a PR", text: "Rebasing before the PR keeps the branch current with whatever landed while the agent worked. The PR targets <code>main</code>.",
+      cmd: "git fetch origin\ngit rebase origin/main\ngit push -u origin " + T101,
+      note: "No graph change in this step. The work is ready and waiting on the gate." , ops: [] },
+    { title: "CI and review pass, then squash merge", text: "B and C collapse into one commit, D, on <code>main</code>. The dashed line shows that D contains the ticket's work without having the ticket's commits as parents. Deploy straight from <code>main</code>.",
+      cmd: "# In your Git host: Squash and merge the PR into main",
+      ops: [{ t: "merge", from: T101, into: "main", id: "D", tag: "deploy", squash: true }] },
+    { title: "Delete the branch and remove the worktree", text: "The ticket is done, so its branch and folder go away. Nothing long-lived is left behind.",
+      cmd: "git worktree remove ../worktrees/101\ngit branch -D " + T101 + "\ngit push origin --delete " + T101,
+      ops: [{ t: "delete", b: T101 }] },
+    { title: "Run many agents at once", text: "Two more agents start from the new <code>main</code>. Each has its own worktree, so they cannot collide on disk.",
+      cmd: "git worktree add -b " + T102 + " ../worktrees/102 origin/main\ngit worktree add -b " + T103 + " ../worktrees/103 origin/main",
+      ops: [{ t: "branch", name: T102, from: "main" }, { t: "commit", b: T102, id: "E" }, { t: "branch", name: T103, from: "main" }, { t: "commit", b: T103, id: "G" }] },
+    { title: "Each ticket lands when it is ready", text: "102 finishes first and deploys as F. 103 rebases onto F before its PR, then deploys as H. History on <code>main</code> stays one commit per ticket, in a straight line.",
+      note: "Because branches live for hours, the rebase is usually trivial. This is why conflict risk is low in this model.",
+      ops: [{ t: "merge", from: T102, into: "main", id: "F", tag: "deploy", squash: true }, { t: "merge", from: T103, into: "main", id: "H", tag: "deploy", squash: true }, { t: "delete", b: T102 }, { t: "delete", b: T103 }] }
+  ];
+  Lab(document.getElementById("lab-trunk"), { steps: function () { return trunkSteps; } });
+
+  /* ---------- selective promotion ---------- */
+  var TICKETS = [
+    { id: "201", n: "ticket/201-auth", c: ["T1a", "T1b"], tag: "squash 201" },
+    { id: "202", n: "ticket/202-report", c: ["T2a", "T2b"], tag: "squash 202" },
+    { id: "203", n: "ticket/203-export", c: ["T3a"], tag: "squash 203" }
+  ];
+  var REL = "release/2026-10-23";
+  var selected = { "201": true, "202": false, "203": true };
+  var mode = "release";
+
+  function chosen() { return TICKETS.filter(function (t) { return selected[t.id]; }); }
+  function names(list) { return list.map(function (t) { return t.id; }).join(", "); }
+
+  function selSteps() {
+    var sel = chosen(), rej = TICKETS.filter(function (t) { return !selected[t.id]; });
+    var st = [];
+    st.push({ title: "Production starts at main", text: "<code>main</code> is what the client runs in production. It only changes at a release.",
+      ops: [{ t: "commit", b: "main", id: "M1", tag: "production" }] });
+    var tOps = [], tCmd = [];
+    TICKETS.forEach(function (t) {
+      tOps.push({ t: "branch", name: t.n, from: "main" });
+      t.c.forEach(function (id) { tOps.push({ t: "commit", b: t.n, id: id }); });
+      tCmd.push("git worktree add -b " + t.n + " ../worktrees/" + t.id + " origin/main");
+    });
+    st.push({ title: "Three tickets, three worktrees, three branches", text: "Every ticket gets its own branch from <code>main</code>, and an agent works on each in isolation. Branches stay open for days, until the release decision.",
+      cmd: tCmd.join("\n"), ops: tOps });
+    var uOps = [{ t: "branch", name: "uat", from: "main" }];
+    TICKETS.forEach(function (t, k) { uOps.push({ t: "merge", from: t.n, into: "uat", id: "U" + (k + 1), tag: k === 2 ? "UAT testing" : undefined }); });
+    st.push({ title: "Merge each ticket into uat for testing", text: "<code>uat</code> is the shared test environment. These are ordinary merges, because <code>uat</code> is disposable and never lands on <code>main</code>.",
+      cmd: "git switch uat\n" + TICKETS.map(function (t) { return "git merge " + t.n; }).join("\n") + "\ngit push origin uat", ops: uOps });
+    st.push({ title: "The client tests and chooses", text: "Approved for release: <strong>" + names(sel) + "</strong>." + (rej.length ? " Not this time: <strong>" + names(rej) + "</strong>. That branch stays open and can ship in a later release." : " Everything was approved."),
+      note: "The two checkboxes and the mode switch above change what happens next. Try approving a different set.", ops: [] });
+
+    if (mode === "release") {
+      st.push({ title: "Cut a fresh release branch from main", text: "The PIC starts from the latest <code>main</code>, not from <code>uat</code>. That keeps rejected tickets out entirely.",
+        cmd: "git fetch origin\ngit switch -c " + REL + " origin/main", ops: [{ t: "branch", name: REL, from: "main" }] });
+      sel.forEach(function (t, k) {
+        st.push({ title: "Squash-merge " + t.n, text: "All of the ticket's commits become one commit on the release branch." +
+          (k === 0 ? " Pick a sensible order: least conflicting first, or by dependency." : " If this ticket touches the same files as an earlier one, you resolve the conflict here, once."),
+          cmd: "git switch " + REL + "\ngit merge --squash " + t.n + "\ngit commit -m \"" + t.n + ": <summary>\"",
+          ops: [{ t: "commit", b: REL, id: "R" + (k + 1), tag: t.tag }, { t: "_squashedge", from: t.n }] });
+      });
+      st.push({ title: "Open one PR: release → main", text: "This is the pull request the client contract requires. After approval, <code>main</code> gains exactly <strong>" + sel.length + "</strong> clean commit" + (sel.length > 1 ? "s" : "") + ", one per approved ticket.",
+        cmd: "git push -u origin " + REL + "\n# Open a PR: " + REL + " → main",
+        note: "Merge this PR with a merge commit or fast-forward. Squashing it again would collapse your " + sel.length + " ticket commits into one.",
+        ops: [{ t: "merge", from: REL, into: "main", id: "M2", tag: "PR → main" }] });
+      var cl = [{ t: "delete", b: REL }, { t: "delete", b: "uat", note: "reset" }];
+      TICKETS.forEach(function (t) { if (selected[t.id]) cl.push({ t: "delete", b: t.n }); });
+      st.push({ title: "Clean up and reset uat", text: "Shipped ticket branches and their worktrees are removed. Resetting <code>uat</code> to <code>main</code> stops rejected tickets from piling up there." + (rej.length ? " The branch for " + names(rej) + " stays open for the next release." : ""),
+        cmd: sel.map(function (t) { return "git worktree remove ../worktrees/" + t.id; }).join("\n") + "\ngit switch uat && git reset --hard origin/main\ngit push --force-with-lease origin uat", ops: cl });
+    } else {
+      sel.forEach(function (t, k) {
+        st.push({ title: "Open a separate PR for " + t.n + " → main", text: k === 0 ? "No release branch. Each approved ticket gets its own PR straight to <code>main</code>." : "This PR was based on the old <code>main</code>. It now has to be rebased onto the result of the previous PR before it can land.",
+          warn: k === 0 ? "" : "Conflicts with the earlier PRs are resolved on <code>main</code> itself, in this PR.",
+          ops: [{ t: "merge", from: t.n, into: "main", id: "M" + (k + 2), tag: "PR " + t.id + " → main", squash: true, warn: k > 0 }] });
+      });
+      st.push({ title: "It works, but it is the harder path", text: "<code>main</code> ends up with the same " + sel.length + " commits, but you resolved conflicts " + (sel.length > 1 ? "sequentially, in " + sel.length + " separate PRs, directly on the production branch" : "directly on the production branch") + ". The order is also fixed by merge timing instead of being chosen on a staging branch.",
+        note: "Switch back to “Release branch” to compare.", ops: [] });
+    }
+    return st;
+  }
+
+  var selRoot = document.getElementById("lab-sel");
+  var controls =
+    '<fieldset><legend>Client approved</legend>' +
+    TICKETS.map(function (t) { return '<label for="ap-' + t.id + '"><input type="checkbox" id="ap-' + t.id + '" data-t="' + t.id + '"' + (selected[t.id] ? " checked" : "") + ">" + t.id + "</label>"; }).join("") +
+    '</fieldset><fieldset><legend>Final step</legend>' +
+    '<label for="m-rel"><input type="radio" name="mode" id="m-rel" value="release" checked>Release branch (recommended)</label>' +
+    '<label for="m-sep"><input type="radio" name="mode" id="m-sep" value="separate">Separate PRs (avoid)</label></fieldset>';
+
+  /* squash edge: a squash op needs the ticket tip, so fold it into the commit op */
+  var rawBuild = build;
+  build = function (ops) {
+    var out = [];
+    for (var k = 0; k < ops.length; k++) {
+      if (ops[k].t === "_squashedge") continue;
+      var next = ops[k + 1];
+      if (ops[k].t === "commit" && next && next.t === "_squashedge") {
+        var o = ops[k], c = {}; for (var p in o) c[p] = o[p];
+        out.push({ t: "merge", from: next.from, into: o.b, id: o.id, tag: o.tag, squash: true, s: o.s });
+      } else out.push(ops[k]);
+    }
+    return rawBuild(out);
+  };
+
+  var selLab = Lab(selRoot, { controls: controls, steps: selSteps });
+  selRoot.querySelector(".lab-top").addEventListener("change", function (e) {
+    var t = e.target;
+    if (t.type === "checkbox") {
+      selected[t.getAttribute("data-t")] = t.checked;
+      if (!chosen().length) { selected[t.getAttribute("data-t")] = true; t.checked = true; }
+    } else if (t.name === "mode") mode = t.value;
+    selLab.reset(3);
+  });
+
+  /* ---------- quiz ---------- */
+  var QS = [
+    { q: "An internal SaaS dashboard deploys ten times a day and the team owns the whole product. Which model fits?",
+      o: ["Trunk-based development", "Selective promotion", "Git Flow with a long-lived develop branch"], a: 0,
+      why: "Frequent deploys, one owner, and flags for unfinished work are exactly what trunk-based is for." },
+    { q: "A client tests five tickets on UAT and approves only two for Friday's release. Which model fits?",
+      o: ["Trunk-based development", "Selective promotion", "Either, there is no difference"], a: 1,
+      why: "The client choosing some tickets after testing is the defining requirement of selective promotion." },
+    { q: "In trunk-based development, how do you merge a half-finished feature without breaking a releasable main?",
+      o: ["Keep the branch open for a month", "Hide it behind a feature flag", "Merge it into a develop branch"], a: 1,
+      why: "Flags let incomplete work land on main without being visible to users, so branches stay short." },
+    { q: "Which branch does the final pull request target in selective promotion?",
+      o: ["uat", "develop", "main, from the release branch"], a: 2,
+      why: "The client contract requires the final PR to land on main. It comes from release/YYYY-MM-DD." },
+    { q: "Why squash-merge approved tickets into a release branch instead of opening four PRs from the ticket branches?",
+      o: ["It makes the branches shorter-lived", "Conflicts between tickets get resolved once, on the release branch", "It removes the need for CI"], a: 1,
+      why: "Separate PRs force sequential conflict resolution on main. The release branch concentrates it in one place and gives one clean commit per ticket." },
+    { q: "What is the main reason for one worktree per ticket?",
+      o: ["Real filesystem isolation, so agents run in parallel without clobbering each other", "It makes git push faster", "It lets two agents share the same branch safely"], a: 0,
+      why: "Each worktree is its own folder with its own checked-out branch, all sharing one repository." },
+    { q: "After a release in selective promotion, what should you do with uat?",
+      o: ["Leave it so rejected tickets keep accumulating", "Reset or rebuild it from main", "Delete it permanently"], a: 1,
+      why: "Resetting uat stops rejected or stale tickets from piling up and muddying the next round of testing." }
+  ];
+  var qi = 0, score = 0, answered = false;
+  var box = document.getElementById("quiz-box");
+  function renderQ() {
+    if (qi >= QS.length) {
+      var msg = score === QS.length ? "You have both models down." : score >= 5 ? "Solid. Re-run the steppers for the ones you missed." : "Worth another pass through the two steppers.";
+      box.innerHTML = '<p class="eyebrow">Finished</p><div class="score">' + score + " / " + QS.length + "</div><p>" + msg + '</p><div class="btnrow"><button class="primary" id="q-again">Try again</button></div>';
+      document.getElementById("q-again").addEventListener("click", function () { qi = 0; score = 0; renderQ(); });
+      return;
+    }
+    answered = false;
+    var q = QS[qi];
+    box.innerHTML = '<div class="qmeta"><span>Question ' + (qi + 1) + " of " + QS.length + '</span><span>Score ' + score + '</span></div><div class="bar"><div style="width:' + (qi / QS.length * 100) + '%"></div></div>' +
+      "<h3>" + esc(q.q) + '</h3><div class="opts">' + q.o.map(function (t, k) { return '<button data-k="' + k + '">' + esc(t) + "</button>"; }).join("") + '</div><div id="q-fb" aria-live="polite"></div>';
+    box.querySelector(".opts").addEventListener("click", function (e) {
+      var b = e.target.closest("button"); if (!b || answered) return;
+      answered = true;
+      var k = +b.getAttribute("data-k"), ok = k === q.a;
+      if (ok) score++;
+      Array.prototype.forEach.call(box.querySelectorAll(".opts button"), function (x, j) { if (j === q.a) x.classList.add("right"); else if (j === k) x.classList.add("wrong"); });
+      document.getElementById("q-fb").innerHTML = '<div class="fb"><strong>' + (ok ? "Correct. " : "Not quite. ") + "</strong>" + esc(q.why) + '</div><div class="btnrow" style="margin-top:12px"><button class="primary" id="q-next">' + (qi === QS.length - 1 ? "See score" : "Next question") + "</button></div>";
+      document.getElementById("q-next").addEventListener("click", function () { qi++; renderQ(); });
+    });
+  }
+  renderQ();
+})();
+</script>
