@@ -159,6 +159,11 @@ button:disabled { opacity: .4; cursor: default; }
 .fresh { transform-box: fill-box; transform-origin: center; animation: pop .35s ease-out; }
 @media (prefers-reduced-motion: reduce) { .fresh { animation: none; } html { scroll-behavior: auto; } }
 
+.critical { border-color: var(--bad); display: grid; gap: 10px; }
+.critical p { color: var(--muted); max-width: 66ch; }
+.critical p strong { color: var(--ink); }
+.tagbad { color: var(--bad); }
+
 /* compare */
 .tablewrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .92rem; }
@@ -250,6 +255,13 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       <p>Use it for internal products and services that deploy several times a day. There is one long-lived branch, <code>main</code>, and it must always be releasable. Every ticket lives on a branch for hours, or two days at most, then lands on <code>main</code>. Unfinished features hide behind feature flags. There is no <code>develop</code> or <code>uat</code> branch.</p>
     </div>
     <div class="panel lab" id="lab-trunk"></div>
+    <div class="panel pad critical" role="note">
+      <p class="eyebrow tagbad">Critical rule</p>
+      <h3>Never commit to a branch after its PR has been merged</h3>
+      <p>A squash merge leaves the branch's original commits unrelated to <code>main</code>. If the agent keeps working on that branch, git sees the old commits as new again. The next PR re-includes the work that already shipped and conflicts with the squash commit.</p>
+      <p><strong>Instead:</strong> delete the branch and worktree when the PR merges. For follow-up work, create a new branch and worktree from the latest <code>main</code>, for example <code>ticket/101-login-fix</code>.</p>
+      <div class="cmd"><pre id="crit-cmd">git worktree add -b ticket/101-login-fix ../worktrees/101b origin/main</pre><button type="button" data-copy="crit-cmd">Copy</button></div>
+    </div>
   </section>
 
   <section id="selective">
@@ -299,7 +311,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
   <section id="quiz">
     <div class="intro">
       <p class="eyebrow">Check yourself</p>
-      <h2>Seven questions</h2>
+      <h2>Eight questions</h2>
     </div>
     <div class="panel quiz" id="quiz-box"></div>
   </section>
@@ -518,6 +530,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       cmd: "# In your Git host: Squash and merge the PR into main",
       ops: [{ t: "merge", from: T101, into: "main", id: "D", tag: rb ? "deploy" : "conflicts again", squash: true, warn: !rb }] });
     st.push({ title: "Delete the branch and remove the worktree", text: "The ticket is done, so its branch and folder go away. Nothing long-lived is left behind.",
+      warn: "Do not commit to this branch again. A follow-up gets a new branch from main.",
       cmd: "git worktree remove ../worktrees/101\ngit branch -D " + T101 + "\ngit push origin --delete " + T101,
       ops: [{ t: "delete", b: T101 }] });
     st.push({ title: "Run many agents at once", text: "Two more agents start from the new <code>main</code>. Each has its own worktree, so they cannot collide on disk.",
@@ -647,6 +660,9 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
     { q: "Why squash-merge approved tickets into a release branch instead of opening four PRs from the ticket branches?",
       o: ["It makes the branches shorter-lived", "Conflicts between tickets get resolved once, on the release branch", "It removes the need for CI"], a: 1,
       why: "Separate PRs force sequential conflict resolution on main. The release branch concentrates it in one place and gives one clean commit per ticket." },
+    { q: "A ticket's PR was squash-merged yesterday. The agent finds a small bug in it. What should it do?",
+      o: ["Commit the fix to the same branch and open another PR", "Create a new branch from the latest main and fix it there", "Merge main into the old branch first, then commit"], a: 1,
+      why: "A merged branch is finished. Its old commits are unrelated to the squash commit on main, so reusing it re-includes shipped work and causes conflicts." },
     { q: "What is the main reason for one worktree per ticket?",
       o: ["Real filesystem isolation, so agents run in parallel without clobbering each other", "It makes git push faster", "It lets two agents share the same branch safely"], a: 0,
       why: "Each worktree is its own folder with its own checked-out branch, all sharing one repository." },
