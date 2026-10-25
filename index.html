@@ -223,7 +223,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
     <div class="intro">
       <p class="eyebrow" style="color:var(--bad)">Start here</p>
       <h2>The history most teams already have</h2>
-      <p>The usual flow uses a plain merge for everything: merge <code>main</code> into your branch to stay current, merge tickets into <code>uat</code>, merge them again into <code>main</code>. Step through it and watch the merge commits pile up. The two models after this exist to avoid exactly this.</p>
+      <p>Many teams run CI/CD from two branches, <code>uat</code> and <code>production</code>, and use a plain merge for everything: merge <code>production</code> into your branch to stay current, merge tickets into <code>uat</code>, merge them again into <code>production</code>, then sync <code>uat</code> back. Step through it and watch the merge commits pile up. The two models after this exist to avoid exactly this.</p>
     </div>
     <div class="panel lab" id="lab-base"></div>
   </section>
@@ -381,7 +381,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
     var lanes = [], laneOf = {}, tip = {}, nodes = [], edges = [], tcount = 0, hist = {};
     function ensure(name) {
       if (name in laneOf) return;
-      var color = name === "main" ? "main" : name === "uat" ? "uat" : name.indexOf("release") === 0 ? "rel" : TICKET_COLORS[tcount++ % 3];
+      var color = name === "main" || name === "production" ? "main" : name === "uat" ? "uat" : name.indexOf("release") === 0 ? "rel" : TICKET_COLORS[tcount++ % 3];
       laneOf[name] = lanes.length;
       lanes.push({ name: name, color: color, deleted: false, note: "" });
     }
@@ -567,26 +567,29 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
   trunkRoot.querySelector(".lab-top").addEventListener("change", function (e) { sync = e.target.value; trunkLab.reset(3); });
 
   /* ---------- baseline: merge everywhere ---------- */
-  var B1 = "ticket/201-auth", B2 = "ticket/202-report";
+  var B1 = "ticket/201-auth", B2 = "ticket/202-report", B3 = "ticket/203-export", PR = "production";
   var baseSteps = [
-    { title: "Start from main", text: "Two tickets are about to begin. Remember how many commits and how many merge commits <code>main</code> ends with.",
-      ops: [{ t: "commit", b: "main", id: "M1" }] },
-    { title: "Two agents branch off and commit", text: "Each ticket gets its own branch. The agents commit in small steps: a1, a2 and b1.",
-      ops: [{ t: "branch", name: B1, from: "main" }, { t: "commit", b: B1, id: "a1" }, { t: "commit", b: B1, id: "a2" }, { t: "branch", name: B2, from: "main" }, { t: "commit", b: B2, id: "b1" }] },
-    { title: "main moves, so every branch merges it in", text: "A fix, X, lands on <code>main</code>. To stay current, each ticket branch runs <code>git merge main</code>. That adds a merge commit to each branch, m1 and m2, which carries no work of its own.",
-      cmd: "git switch " + B1 + " && git merge origin/main\ngit switch " + B2 + " && git merge origin/main",
-      warn: "Every PR diff now mixes main's code with the ticket's.",
-      ops: [{ t: "commit", b: "main", id: "X", tag: "fix lands" }, { t: "merge", from: "main", into: B1, id: "m1", tag: "merge main", warn: true }, { t: "merge", from: "main", into: B2, id: "m2", tag: "merge main", warn: true }] },
-    { title: "Tickets are merged into uat", text: "Plain merges into <code>uat</code> for testing. That part is fine, because <code>uat</code> is disposable.",
-      ops: [{ t: "branch", name: "uat", from: "main" }, { t: "merge", from: B1, into: "uat", id: "U1" }, { t: "merge", from: B2, into: "uat", id: "U2", tag: "UAT" }] },
-    { title: "More commits, more merging", text: "The client reports a problem, so ticket 201 gets a3. <code>main</code> moves again with Y, and the branch merges it in again as m3. Every round adds another empty merge commit.",
-      ops: [{ t: "commit", b: B1, id: "a3" }, { t: "commit", b: "main", id: "Y", tag: "next fix" }, { t: "merge", from: "main", into: B1, id: "m3", tag: "merge main", warn: true }] },
-    { title: "Release: merge each ticket into main", text: "The tickets land with plain merges. Each one adds one more merge commit, R1 and R2, on <code>main</code>.",
-      cmd: "git switch main\ngit merge " + B1 + "\ngit merge " + B2,
-      ops: [{ t: "merge", from: B1, into: "main", id: "R1", tag: "merge", warn: true }, { t: "merge", from: B2, into: "main", id: "R2", tag: "merge", warn: true }] },
-    { title: "Count the damage", text: "<code>main</code> now holds <strong>12 commits</strong> for 2 tickets and 4 real changes. <strong>5 are merge commits</strong> (m1, m2, m3, R1, R2, in red) that carry no work of their own.",
-      warn: "Reverting one ticket means reverting a merge and untangling the main code merged into it. Reading the log or bisecting means walking through interleaved branches. Choosing only some tickets to ship is hard, because their branches already contain main's changes.",
-      note: "Now compare. In trunk-based development, <code>main</code> gets 1 commit per ticket and 0 merge commits. Selective promotion ends with the same result.",
+    { title: "Two environment branches, both deployed by CI", text: "<code>production</code> deploys to production and <code>uat</code> deploys to the UAT environment. The team treats both as branches that people merge into. Here <code>production</code> plays the part <code>main</code> plays in the rest of this lesson.",
+      ops: [{ t: "commit", b: PR, id: "P1", tag: "deploys to prod" }, { t: "branch", name: "uat", from: PR }] },
+    { title: "Three agents branch off and commit", text: "Each ticket gets its own branch. The agents commit in small steps.",
+      ops: [{ t: "branch", name: B1, from: PR }, { t: "commit", b: B1, id: "a1" }, { t: "commit", b: B1, id: "a2" }, { t: "branch", name: B2, from: PR }, { t: "commit", b: B2, id: "b1" }, { t: "branch", name: B3, from: PR }, { t: "commit", b: B3, id: "c1" }] },
+    { title: "Every ticket is merged into uat", text: "Plain merges into <code>uat</code>, and CI deploys it for the client to test.",
+      cmd: "git switch uat\ngit merge " + B1 + "\ngit merge " + B2 + "\ngit merge " + B3,
+      ops: [{ t: "merge", from: B1, into: "uat", id: "U1" }, { t: "merge", from: B2, into: "uat", id: "U2" }, { t: "merge", from: B3, into: "uat", id: "U3", tag: "UAT" }] },
+    { title: "A hotfix lands, so everything merges production in", text: "A production hotfix, H, goes out. Now every open ticket branch and <code>uat</code> must merge <code>production</code> in to stay current. That is four merge commits that carry no work of their own.",
+      cmd: "git switch " + B1 + " && git merge production   # and again for 202, 203\ngit switch uat && git merge production",
+      warn: "Every PR diff now mixes production's code with the ticket's.",
+      ops: [{ t: "commit", b: PR, id: "H", tag: "hotfix" }, { t: "merge", from: PR, into: B1, id: "m1", tag: "merge prod", warn: true }, { t: "merge", from: PR, into: B2, id: "m2", tag: "merge prod", warn: true }, { t: "merge", from: PR, into: B3, id: "m3", tag: "merge prod", warn: true }, { t: "merge", from: PR, into: "uat", id: "s1", tag: "sync uat", warn: true }] },
+    { title: "The client approves 201 and 203, and rejects 202", text: "Merging <code>uat</code> into <code>production</code> would ship ticket 202 as well, because it is already inside <code>uat</code>. So each approved ticket is merged straight into <code>production</code>, and any conflict between 201 and 203 is fixed there by hand, in a merge that was never tested on <code>uat</code>.",
+      cmd: "git switch production\ngit merge " + B1 + "\ngit merge " + B3,
+      warn: "Production now holds merge commits and fixes that UAT never saw.",
+      ops: [{ t: "merge", from: B1, into: PR, id: "R1", tag: "merge", warn: true }, { t: "merge", from: B3, into: PR, id: "R2", tag: "merge", warn: true }] },
+    { title: "Then uat has to be synced back", text: "<code>production</code> changed, so <code>uat</code> merges it back, with yet another merge commit. And <code>uat</code> still contains rejected ticket 202, so it no longer matches <code>production</code> plus what is pending.",
+      cmd: "git switch uat && git merge production",
+      ops: [{ t: "merge", from: PR, into: "uat", id: "s2", tag: "sync back", warn: true }] },
+    { title: "Count the damage", text: "<code>production</code> holds <strong>9 commits</strong> for 2 shipped tickets. Only 5 are real work: the first commit, the hotfix, and three ticket commits. <strong>4 are merge commits</strong> (m1, m3, R1, R2, in red). <code>uat</code> carries 5 more of its own.",
+      warn: "Reverting one ticket means reverting a merge and untangling the production code merged into it. Both environment branches must be synced in both directions after every release. Rejected code lives on in <code>uat</code>. Conflict fixes reach production untested.",
+      note: "Now compare. In trunk-based development, <code>main</code> gets 1 commit per ticket and 0 merge commits. Selective promotion ends with the same result, and <code>uat</code> is reset after each release.",
       ops: [] }
   ];
   Lab(document.getElementById("lab-base"), { steps: function () { return baseSteps; } });
