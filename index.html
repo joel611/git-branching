@@ -351,11 +351,11 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
   renderWt();
 
   /* ---------- git graph engine ---------- */
-  var DX = 80, DY = 56, X0 = 34, Y0 = 46, R = 12;
+  var DX = 80, DY = 56, X0 = 64, Y0 = 46, R = 12;
   var TICKET_COLORS = ["t1", "t2", "t3"];
 
   function build(ops) {
-    var lanes = [], laneOf = {}, tip = {}, nodes = [], edges = [], tcount = 0;
+    var lanes = [], laneOf = {}, tip = {}, nodes = [], edges = [], tcount = 0, hist = {};
     function ensure(name) {
       if (name in laneOf) return;
       var color = name === "main" ? "main" : name === "uat" ? "uat" : name.indexOf("release") === 0 ? "rel" : TICKET_COLORS[tcount++ % 3];
@@ -367,11 +367,11 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       if (op.t === "branch") {
         ensure(op.name);
         n = { kind: "fork", lane: laneOf[op.name], step: op.s, color: lanes[laneOf[op.name]].color };
-        nodes.push(n); edges.push({ a: tip[op.from], b: n, color: n.color, out: true }); tip[op.name] = n;
+        nodes.push(n); edges.push({ a: tip[op.from], b: n, color: n.color, out: true }); tip[op.name] = n; hist[op.name] = [n];
       } else if (op.t === "commit") {
         ensure(op.b);
         n = { kind: "commit", id: op.id, tag: op.tag, lane: laneOf[op.b], step: op.s, color: lanes[laneOf[op.b]].color };
-        nodes.push(n); if (tip[op.b]) edges.push({ a: tip[op.b], b: n, color: n.color }); tip[op.b] = n;
+        nodes.push(n); if (tip[op.b]) edges.push({ a: tip[op.b], b: n, color: n.color }); tip[op.b] = n; (hist[op.b] = hist[op.b] || []).push(n);
       } else if (op.t === "merge") {
         ensure(op.into);
         n = { kind: "commit", id: op.id, tag: op.tag, lane: laneOf[op.into], step: op.s, color: lanes[laneOf[op.into]].color, warn: op.warn };
@@ -379,6 +379,14 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
         edges.push({ a: tip[op.into], b: n, color: n.color });
         edges.push({ a: tip[op.from], b: n, color: lanes[laneOf[op.from]].color, dashed: !!op.squash });
         tip[op.into] = n;
+      } else if (op.t === "rebase") {
+        (hist[op.b] || []).forEach(function (x) { x.faded = true; });
+        var prev = tip[op.onto];
+        op.ids.forEach(function (id, k) {
+          n = { kind: "commit", id: id, tag: k === op.ids.length - 1 ? op.tag : undefined, lane: laneOf[op.b], step: op.s, color: lanes[laneOf[op.b]].color };
+          nodes.push(n); edges.push({ a: prev, b: n, color: n.color, out: k === 0 }); prev = n;
+        });
+        tip[op.b] = prev;
       } else if (op.t === "delete") {
         var l = lanes[laneOf[op.b]]; l.deleted = true; l.note = op.note || "merged";
       }
@@ -405,15 +413,15 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       if (a.y === b.y) d = "M" + a.x + " " + a.y + " L" + b.x + " " + b.y;
       else if (e.out) { var k1 = a.x + 36; d = "M" + a.x + " " + a.y + " C" + (a.x + 22) + " " + a.y + " " + (a.x + 14) + " " + b.y + " " + k1 + " " + b.y + " L" + b.x + " " + b.y; }
       else { var k2 = b.x - 36; d = "M" + a.x + " " + a.y + " L" + k2 + " " + a.y + " C" + (k2 + 22) + " " + a.y + " " + (k2 + 14) + " " + b.y + " " + b.x + " " + b.y; }
-      s += '<path class="edge" d="' + d + '" stroke="' + colorVar(e.color) + '"' + (e.dashed ? ' stroke-dasharray="6 5"' : "") + "/>";
+      s += '<path class="edge" d="' + d + '" stroke="' + colorVar(e.color) + '"' + (a.faded || b.faded ? ' opacity=".28"' : "") + (e.dashed ? ' stroke-dasharray="6 5"' : "") + "/>";
     });
     g.nodes.forEach(function (n) {
       var fresh = n.step === current, cls = fresh ? ' class="fresh"' : "";
       if (n.kind === "fork") {
-        s += '<g' + cls + '><circle class="node-f" cx="' + n.x + '" cy="' + n.y + '" r="6" stroke="' + colorVar(n.color) + '"/></g>';
+        s += '<g' + cls + (n.faded ? ' opacity=".28"' : "") + '><circle class="node-f" cx="' + n.x + '" cy="' + n.y + '" r="6" stroke="' + colorVar(n.color) + '"/></g>';
         return;
       }
-      s += "<g" + cls + ">";
+      s += "<g" + cls + (n.faded ? ' opacity=".28"' : "") + ">";
       if (fresh) s += '<circle class="halo" cx="' + n.x + '" cy="' + n.y + '" r="' + (R + 5) + '" stroke="' + colorVar(n.color) + '"/>';
       s += '<circle class="node-c" cx="' + n.x + '" cy="' + n.y + '" r="' + R + '" stroke="' + colorVar(n.color) + '"/>';
       s += '<text class="node-t" x="' + n.x + '" y="' + n.y + '">' + esc(n.id) + "</text>";
@@ -480,31 +488,52 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
 
   /* ---------- trunk steps ---------- */
   var T101 = "ticket/101-login", T102 = "ticket/102-api", T103 = "ticket/103-ui";
-  var trunkSteps = [
-    { title: "main is the only long-lived branch", text: "It must always be releasable. Anything on <code>main</code> could be deployed right now.",
-      ops: [{ t: "commit", b: "main", id: "A", tag: "always releasable" }] },
-    { title: "Give the agent its own worktree and branch", text: "Always branch from the latest <code>main</code>. The new folder is where the agent works, and nowhere else.",
+  var sync = "rebase";
+  function trunkSteps() {
+    var rb = sync === "rebase", st = [];
+    st.push({ title: "main is the only long-lived branch", text: "It must always be releasable. Anything on <code>main</code> could be deployed right now.",
+      ops: [{ t: "commit", b: "main", id: "A", tag: "always releasable" }] });
+    st.push({ title: "Give the agent its own worktree and branch", text: "Always branch from the latest <code>main</code>. The new folder is where the agent works, and nowhere else.",
       cmd: "git worktree add -b " + T101 + " ../worktrees/101 origin/main",
-      ops: [{ t: "branch", name: T101, from: "main" }] },
-    { title: "The agent commits freely inside its worktree", text: "Agents tend to commit in many small, exploratory steps. That is fine, because the squash at the end will hide them.",
-      ops: [{ t: "commit", b: T101, id: "B" }, { t: "commit", b: T101, id: "C" }] },
-    { title: "Rebase onto main, push, open a PR", text: "Rebasing before the PR keeps the branch current with whatever landed while the agent worked. The PR targets <code>main</code>.",
-      cmd: "git fetch origin\ngit rebase origin/main\ngit push -u origin " + T101,
-      note: "No graph change in this step. The work is ready and waiting on the gate." , ops: [] },
-    { title: "CI and review pass, then squash merge", text: "B and C collapse into one commit, D, on <code>main</code>. The dashed line shows that D contains the ticket's work without having the ticket's commits as parents. Deploy straight from <code>main</code>.",
+      ops: [{ t: "branch", name: T101, from: "main" }] });
+    st.push({ title: "The agent commits while main moves on", text: "The agent commits in small, exploratory steps, B and C. Meanwhile a teammate lands X on <code>main</code>, and X touches some of the same lines as the ticket.",
+      note: "This is normal. Even with branches that live for hours, <code>main</code> keeps moving.",
+      ops: [{ t: "commit", b: T101, id: "B" }, { t: "commit", b: T101, id: "C" }, { t: "commit", b: "main", id: "X", tag: "teammate lands" }] });
+    if (rb) {
+      st.push({ title: "Rebase onto main and resolve the conflict now", text: "Rebase replays B and C on top of the current <code>main</code> as B′ and C′. Git stops where the ticket collides with X, and you resolve it here, in the branch, while the ticket is still fresh. Afterwards the branch contains only the ticket's changes, sitting directly on top of X.",
+        cmd: "git fetch origin\ngit rebase origin/main\n# on conflict: fix files, then\ngit add . && git rebase --continue\ngit push --force-with-lease -u origin " + T101,
+        note: "The old B and C are faded because rebase replaces them with new commits. <code>--force-with-lease</code> is needed for that and is safe on a branch only one agent owns. Then open the PR against <code>main</code>.",
+        ops: [{ t: "rebase", b: T101, onto: "main", ids: ["B′", "C′"], tag: "conflict resolved" }] });
+    } else {
+      st.push({ title: "Merging main into the branch (the common mistake)", text: "Instead of rebasing, the agent runs <code>git merge origin/main</code>. That adds a merge commit, MM, which carries X and the conflict resolution into the ticket branch. The branch history now mixes <code>main</code>'s code with the ticket's.",
+        cmd: "git fetch origin\ngit merge origin/main\n# on conflict: fix files, then\ngit commit\ngit push -u origin " + T101,
+        warn: "The PR now shows extra commits and changes that do not belong to the ticket, which makes review harder.",
+        ops: [{ t: "merge", from: "main", into: T101, id: "MM", tag: "merge main", warn: true }] });
+    }
+    st.push({ title: "CI and review pass, then squash merge", text: rb
+        ? "B′ and C′ collapse into one commit, D, on <code>main</code>. The dashed line shows that D contains the ticket's work without having the ticket's commits as parents. Deploy straight from <code>main</code>."
+        : "B, C and MM collapse into one commit, D, on <code>main</code>. The dashed line shows that D contains the branch's work without having its commits as parents.",
+      note: rb ? "The branch already sits on top of current <code>main</code> and the conflict was settled in the previous step, so the squash applies cleanly. That is the payoff of rebasing first." : "",
+      warn: rb ? "" : "Squash does not record that the main code inside the branch is the same as the real commits on <code>main</code>. The branch's own commits stay unrelated to D, so the squash can conflict with <code>main</code> again, conflicts you already resolved in MM come back, and any branch or follow-up PR built on this one collides with <code>main</code>.",
       cmd: "# In your Git host: Squash and merge the PR into main",
-      ops: [{ t: "merge", from: T101, into: "main", id: "D", tag: "deploy", squash: true }] },
-    { title: "Delete the branch and remove the worktree", text: "The ticket is done, so its branch and folder go away. Nothing long-lived is left behind.",
+      ops: [{ t: "merge", from: T101, into: "main", id: "D", tag: rb ? "deploy" : "conflicts again", squash: true, warn: !rb }] });
+    st.push({ title: "Delete the branch and remove the worktree", text: "The ticket is done, so its branch and folder go away. Nothing long-lived is left behind.",
       cmd: "git worktree remove ../worktrees/101\ngit branch -D " + T101 + "\ngit push origin --delete " + T101,
-      ops: [{ t: "delete", b: T101 }] },
-    { title: "Run many agents at once", text: "Two more agents start from the new <code>main</code>. Each has its own worktree, so they cannot collide on disk.",
+      ops: [{ t: "delete", b: T101 }] });
+    st.push({ title: "Run many agents at once", text: "Two more agents start from the new <code>main</code>. Each has its own worktree, so they cannot collide on disk.",
       cmd: "git worktree add -b " + T102 + " ../worktrees/102 origin/main\ngit worktree add -b " + T103 + " ../worktrees/103 origin/main",
-      ops: [{ t: "branch", name: T102, from: "main" }, { t: "commit", b: T102, id: "E" }, { t: "branch", name: T103, from: "main" }, { t: "commit", b: T103, id: "G" }] },
-    { title: "Each ticket lands when it is ready", text: "102 finishes first and deploys as F. 103 rebases onto F before its PR, then deploys as H. History on <code>main</code> stays one commit per ticket, in a straight line.",
+      ops: [{ t: "branch", name: T102, from: "main" }, { t: "commit", b: T102, id: "E" }, { t: "branch", name: T103, from: "main" }, { t: "commit", b: T103, id: "G" }] });
+    st.push({ title: "Each ticket lands when it is ready", text: "102 finishes first and deploys as F. 103 rebases onto F before its PR, then deploys as H. History on <code>main</code> stays one commit per ticket, in a straight line.",
       note: "Because branches live for hours, the rebase is usually trivial. This is why conflict risk is low in this model.",
-      ops: [{ t: "merge", from: T102, into: "main", id: "F", tag: "deploy", squash: true }, { t: "merge", from: T103, into: "main", id: "H", tag: "deploy", squash: true }, { t: "delete", b: T102 }, { t: "delete", b: T103 }] }
-  ];
-  Lab(document.getElementById("lab-trunk"), { steps: function () { return trunkSteps; } });
+      ops: [{ t: "merge", from: T102, into: "main", id: "F", tag: "deploy", squash: true }, { t: "merge", from: T103, into: "main", id: "H", tag: "deploy", squash: true }, { t: "delete", b: T102 }, { t: "delete", b: T103 }] });
+    return st;
+  }
+  var trunkRoot = document.getElementById("lab-trunk");
+  var trunkLab = Lab(trunkRoot, { steps: trunkSteps, controls:
+    '<fieldset><legend>Keep the branch current with</legend>' +
+    '<label for="s-rb"><input type="radio" name="sync" id="s-rb" value="rebase" checked>Rebase (recommended)</label>' +
+    '<label for="s-mg"><input type="radio" name="sync" id="s-mg" value="merge">Merge main in (common mistake)</label></fieldset>' });
+  trunkRoot.querySelector(".lab-top").addEventListener("change", function (e) { sync = e.target.value; trunkLab.reset(3); });
 
   /* ---------- selective promotion ---------- */
   var TICKETS = [
