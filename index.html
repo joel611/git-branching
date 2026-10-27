@@ -157,7 +157,13 @@ button:disabled { opacity: .4; cursor: default; }
 .halo { fill: none; stroke-width: 3; opacity: .35; }
 @keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .fresh { transform-box: fill-box; transform-origin: center; animation: pop .35s ease-out; }
-@media (prefers-reduced-motion: reduce) { .fresh { animation: none; } html { scroll-behavior: auto; } }
+@keyframes fly { 0% { transform: translate(var(--dx), var(--dy)); } 50% { transform: translate(calc(var(--dx) * .5), calc(var(--dy) * .5 - 34px)); } 100% { transform: translate(0, 0); } }
+@keyframes fadein { from { opacity: 0; } }
+@keyframes dimin { from { opacity: 1; } }
+.fly { animation: fly .9s ease-in-out backwards; }
+.late { animation: fadein .4s ease-out backwards; }
+.dimming { animation: dimin .6s ease-out backwards; }
+@media (prefers-reduced-motion: reduce) { .fresh, .fly, .late, .dimming { animation: none; } html { scroll-behavior: auto; } }
 
 .critical { border-color: var(--bad); display: grid; gap: 10px; }
 .critical p { color: var(--muted); max-width: 66ch; }
@@ -407,10 +413,11 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
           edges.push({ a: x, b: n, color: lanes[laneOf[op.from]].color, dashed: true }); tip[op.into] = n;
         });
       } else if (op.t === "rebase") {
-        (hist[op.b] || []).forEach(function (x) { x.faded = true; });
+        var olds = (hist[op.b] || []).filter(function (x) { return x.kind === "commit"; });
+        (hist[op.b] || []).forEach(function (x) { x.faded = true; x.fadedStep = op.s; });
         var prev = tip[op.onto];
         op.ids.forEach(function (id, k) {
-          n = { kind: "commit", id: id, tag: k === op.ids.length - 1 ? op.tag : undefined, lane: laneOf[op.b], step: op.s, color: lanes[laneOf[op.b]].color };
+          n = { kind: "commit", id: id, tag: k === op.ids.length - 1 ? op.tag : undefined, lane: laneOf[op.b], step: op.s, color: lanes[laneOf[op.b]].color, origin: olds[k], order: k };
           nodes.push(n); edges.push({ a: prev, b: n, color: n.color, out: k === 0 }); prev = n;
         });
         tip[op.b] = prev;
@@ -440,10 +447,17 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       if (a.y === b.y) d = "M" + a.x + " " + a.y + " L" + b.x + " " + b.y;
       else if (e.out) { var k1 = a.x + 36; d = "M" + a.x + " " + a.y + " C" + (a.x + 22) + " " + a.y + " " + (a.x + 14) + " " + b.y + " " + k1 + " " + b.y + " L" + b.x + " " + b.y; }
       else { var k2 = b.x - 36; d = "M" + a.x + " " + a.y + " L" + k2 + " " + a.y + " C" + (k2 + 22) + " " + a.y + " " + (k2 + 14) + " " + b.y + " " + b.x + " " + b.y; }
-      s += '<path class="edge" d="' + d + '" stroke="' + colorVar(e.color) + '"' + (a.faded || b.faded ? ' opacity=".28"' : "") + (e.dashed ? ' stroke-dasharray="6 5"' : "") + "/>";
+      var ecl = "edge", est = "";
+      if ((a.faded && a.fadedStep === current) || (b.faded && b.fadedStep === current)) ecl += " dimming";
+      if (b.origin && b.step === current) { ecl += " late"; est = ' style="animation-delay:' + (0.9 + b.order * 0.5) + 's"'; }
+      s += '<path class="' + ecl + '"' + est + ' d="' + d + '" stroke="' + colorVar(e.color) + '"' + (a.faded || b.faded ? ' opacity=".28"' : "") + (e.dashed ? ' stroke-dasharray="6 5"' : "") + "/>";
     });
     g.nodes.forEach(function (n) {
-      var fresh = n.step === current, cls = fresh ? ' class="fresh"' : "";
+      var fresh = n.step === current, cl = [], sty = "";
+      if (fresh) cl.push(n.origin ? "fly" : "fresh");
+      if (n.faded && n.fadedStep === current) cl.push("dimming");
+      if (fresh && n.origin) sty = ' style="--dx:' + (n.origin.x - n.x) + "px;--dy:" + (n.origin.y - n.y) + "px;animation-delay:" + (0.3 + n.order * 0.5) + 's"';
+      var cls = (cl.length ? ' class="' + cl.join(" ") + '"' : "") + sty;
       if (n.kind === "fork") {
         s += '<g' + cls + (n.faded ? ' opacity=".28"' : "") + '><circle class="node-f" cx="' + n.x + '" cy="' + n.y + '" r="6" stroke="' + colorVar(n.color) + '"/></g>';
         return;
@@ -495,7 +509,10 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
         body.innerHTML = '<p class="kicker">Step ' + (i + 1) + " of " + steps.length + "</p><h3>" + esc(st.title) + "</h3><p>" + st.text + "</p>" +
           (st.cmd ? '<div class="cmd"><pre>' + esc(st.cmd) + '</pre><button type="button" class="cp">Copy</button></div>' : "") +
           (st.note ? '<p class="note">' + st.note + "</p>" : "") +
-          (st.warn ? '<p class="warn">' + st.warn + "</p>" : "");
+          (st.warn ? '<p class="warn">' + st.warn + "</p>" : "") +
+          (st.ops.some(function (o) { return o.t === "rebase"; }) ? '<div class="btnrow"><button type="button" class="replay">↻ Replay rebase</button></div>' : "");
+        var rp = body.querySelector(".replay");
+        if (rp) rp.addEventListener("click", function () { api.render(); });
         var cp = body.querySelector(".cp");
         if (cp) cp.addEventListener("click", function () { copyFrom(body.querySelector(".cmd pre"), cp); });
         dots.innerHTML = steps.map(function (_, k) {
