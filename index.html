@@ -156,14 +156,16 @@ button:disabled { opacity: .4; cursor: default; }
 .pill-t { font: 600 9.5px var(--f-mono); fill: var(--pill-ink); text-anchor: middle; dominant-baseline: central; }
 .halo { fill: none; stroke-width: 3; opacity: .35; }
 @keyframes pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-.fresh { transform-box: fill-box; transform-origin: center; animation: pop .35s ease-out; }
+.fresh { transform-box: fill-box; transform-origin: center; animation: pop .35s ease-out backwards; }
 @keyframes fly { 0% { transform: translate(var(--dx), var(--dy)); } 50% { transform: translate(calc(var(--dx) * .5), calc(var(--dy) * .5 - 34px)); } 100% { transform: translate(0, 0); } }
 @keyframes fadein { from { opacity: 0; } }
 @keyframes dimin { from { opacity: 1; } }
+@keyframes squash { 0% { transform: translate(0, 0); opacity: 1; } 40% { transform: translate(var(--gx), 0); opacity: 1; } 90% { transform: translate(var(--tx), var(--ty)); opacity: 1; } 100% { transform: translate(var(--tx), var(--ty)); opacity: 0; } }
+.ghost { animation: squash 1.2s ease-in-out forwards; }
 .fly { animation: fly .9s ease-in-out backwards; }
 .late { animation: fadein .4s ease-out backwards; }
 .dimming { animation: dimin .6s ease-out backwards; }
-@media (prefers-reduced-motion: reduce) { .fresh, .fly, .late, .dimming { animation: none; } html { scroll-behavior: auto; } }
+@media (prefers-reduced-motion: reduce) { .fresh, .fly, .late, .dimming { animation: none; } .ghost { display: none; } html { scroll-behavior: auto; } }
 
 .critical { border-color: var(--bad); display: grid; gap: 10px; }
 .critical p { color: var(--muted); max-width: 66ch; }
@@ -400,7 +402,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
         nodes.push(n); if (tip[op.b]) edges.push({ a: tip[op.b], b: n, color: n.color }); tip[op.b] = n; (hist[op.b] = hist[op.b] || []).push(n);
       } else if (op.t === "merge") {
         ensure(op.into);
-        n = { kind: "commit", id: op.id, tag: op.tag, lane: laneOf[op.into], step: op.s, color: lanes[laneOf[op.into]].color, warn: op.warn };
+        n = { kind: "commit", id: op.id, tag: op.tag, lane: laneOf[op.into], step: op.s, color: lanes[laneOf[op.into]].color, warn: op.warn, squashSrc: op.squash ? (hist[op.from] || []).filter(function (x) { return x.kind === "commit" && !x.faded; }) : null };
         nodes.push(n);
         edges.push({ a: tip[op.into], b: n, color: n.color });
         edges.push({ a: tip[op.from], b: n, color: lanes[laneOf[op.from]].color, dashed: !!op.squash });
@@ -418,7 +420,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
         var prev = tip[op.onto];
         op.ids.forEach(function (id, k) {
           n = { kind: "commit", id: id, tag: k === op.ids.length - 1 ? op.tag : undefined, lane: laneOf[op.b], step: op.s, color: lanes[laneOf[op.b]].color, origin: olds[k], order: k };
-          nodes.push(n); edges.push({ a: prev, b: n, color: n.color, out: k === 0 }); prev = n;
+          nodes.push(n); (hist[op.b] = hist[op.b] || []).push(n); edges.push({ a: prev, b: n, color: n.color, out: k === 0 }); prev = n;
         });
         tip[op.b] = prev;
       } else if (op.t === "delete") {
@@ -450,6 +452,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       var ecl = "edge", est = "";
       if ((a.faded && a.fadedStep === current) || (b.faded && b.fadedStep === current)) ecl += " dimming";
       if (b.origin && b.step === current) { ecl += " late"; est = ' style="animation-delay:' + (0.9 + b.order * 0.5) + 's"'; }
+      else if (b.squashSrc && b.squashSrc.length && b.step === current) { ecl += " late"; est = ' style="animation-delay:1.1s"'; }
       s += '<path class="' + ecl + '"' + est + ' d="' + d + '" stroke="' + colorVar(e.color) + '"' + (a.faded || b.faded ? ' opacity=".28"' : "") + (e.dashed ? ' stroke-dasharray="6 5"' : "") + "/>";
     });
     g.nodes.forEach(function (n) {
@@ -457,6 +460,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       if (fresh) cl.push(n.origin ? "fly" : "fresh");
       if (n.faded && n.fadedStep === current) cl.push("dimming");
       if (fresh && n.origin) sty = ' style="--dx:' + (n.origin.x - n.x) + "px;--dy:" + (n.origin.y - n.y) + "px;animation-delay:" + (0.3 + n.order * 0.5) + 's"';
+      if (fresh && n.squashSrc && n.squashSrc.length) sty = ' style="animation-delay:1.1s"';
       var cls = (cl.length ? ' class="' + cl.join(" ") + '"' : "") + sty;
       if (n.kind === "fork") {
         s += '<g' + cls + (n.faded ? ' opacity=".28"' : "") + '><circle class="node-f" cx="' + n.x + '" cy="' + n.y + '" r="6" stroke="' + colorVar(n.color) + '"/></g>';
@@ -472,6 +476,15 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
         s += '<text class="pill-t" x="' + n.x + '" y="' + (n.y - 27.5) + '">' + esc(n.tag) + "</text>";
       }
       s += "</g>";
+    });
+    g.nodes.forEach(function (n) {
+      if (n.step !== current || !n.squashSrc || !n.squashSrc.length) return;
+      var tip = n.squashSrc[n.squashSrc.length - 1];
+      n.squashSrc.forEach(function (x) {
+        s += '<g class="ghost" style="--gx:' + (tip.x - x.x) + "px;--tx:" + (n.x - x.x) + "px;--ty:" + (n.y - x.y) + 'px">' +
+          '<circle class="node-c" cx="' + x.x + '" cy="' + x.y + '" r="' + R + '" stroke="' + colorVar(x.color) + '"/>' +
+          '<text class="node-t" x="' + x.x + '" y="' + x.y + '">' + esc(x.id) + "</text></g>";
+      });
     });
     s += "</svg>";
     scroller.innerHTML = s;
@@ -510,7 +523,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
           (st.cmd ? '<div class="cmd"><pre>' + esc(st.cmd) + '</pre><button type="button" class="cp">Copy</button></div>' : "") +
           (st.note ? '<p class="note">' + st.note + "</p>" : "") +
           (st.warn ? '<p class="warn">' + st.warn + "</p>" : "") +
-          (st.ops.some(function (o) { return o.t === "rebase"; }) ? '<div class="btnrow"><button type="button" class="replay">↻ Replay rebase</button></div>' : "");
+          (st.ops.some(function (o) { return o.t === "rebase" || o.squash || o.t === "_squashedge"; }) ? '<div class="btnrow"><button type="button" class="replay">↻ Replay animation</button></div>' : "");
         var rp = body.querySelector(".replay");
         if (rp) rp.addEventListener("click", function () { api.render(); });
         var cp = body.querySelector(".cp");
