@@ -212,7 +212,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
   <header class="hero">
     <p class="eyebrow">Interactive lesson</p>
     <h1>Branching strategies when agents write the code</h1>
-    <p class="lede">Many AI agents work in parallel, each on its own ticket, and every change goes through a pull request. Two branching models handle that well. You will step through both, build a release yourself, and finish with a short quiz.</p>
+    <p class="lede">Many agents work in parallel, one ticket each, and every change lands through a pull request. Two branching models fit this. Step through both, then take the quiz.</p>
     <div class="chips">
       <a class="chip" href="#trunk"><i style="background:var(--c-main)"></i>Trunk-based: internal products, ship constantly</a>
       <a class="chip" href="#selective"><i style="background:var(--c-rel)"></i>Selective promotion: client work, partial releases</a>
@@ -223,7 +223,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
     <div class="intro">
       <p class="eyebrow" style="color:var(--bad)">Start here</p>
       <h2>The history most teams already have</h2>
-      <p>Many teams run CI/CD from two branches, <code>uat</code> and <code>production</code>, and use a plain merge for everything: merge <code>production</code> into your branch to stay current, merge tickets into <code>uat</code>, merge them again into <code>production</code>, then sync <code>uat</code> back. Step through it and watch the merge commits pile up. The two models after this exist to avoid exactly this.</p>
+      <p>Many teams deploy from two branches, <code>uat</code> and <code>production</code>, and use plain merges for everything. Step through it and count the merge commits.</p>
     </div>
     <div class="panel lab" id="lab-base"></div>
   </section>
@@ -231,20 +231,19 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
   <section id="foundation">
     <div class="intro">
       <p class="eyebrow">Shared foundation</p>
-      <h2>Four habits both models rely on</h2>
-      <p>The models differ in where work is integrated. The way each ticket is isolated and landed is the same.</p>
+      <h2>Four rules both models share</h2>
     </div>
     <div class="principles">
-      <div><h3>One worktree, one branch per ticket</h3><p>Each agent gets its own folder on disk, so parallel agents never overwrite each other's files.</p></div>
-      <div><h3>Short-lived ticket branches</h3><p>A branch exists to land one ticket. The longer it lives, the more it drifts from its base.</p></div>
-      <div><h3>Pull requests are the gate</h3><p>CI and review run on the PR. Nothing reaches a shared branch without passing it.</p></div>
-      <div><h3>Squash merge agent work</h3><p>Agents commit exploratory steps. A squash turns them into one readable commit per ticket.</p></div>
+      <div><h3>One worktree, one branch per ticket</h3><p>Each agent gets its own folder. Parallel agents cannot overwrite each other.</p></div>
+      <div><h3>Short-lived ticket branches</h3><p>A branch exists to land one ticket. Long-lived branches drift from their base.</p></div>
+      <div><h3>Pull requests are the gate</h3><p>CI and review run on the PR. Nothing reaches a shared branch without them.</p></div>
+      <div><h3>Squash merge agent work</h3><p>Many small agent commits become one commit per ticket.</p></div>
     </div>
 
     <div class="panel wt">
       <div>
         <h3>Try it: add agents</h3>
-        <p class="small">Each agent gets a worktree created from <code>origin/main</code>. Add a few and watch the folders appear.</p>
+        <p class="small">Each agent gets a worktree from <code>origin/main</code>.</p>
         <div class="btnrow">
           <button class="primary" id="wt-add">Add an agent</button>
           <button id="wt-remove">Remove last</button>
@@ -262,14 +261,14 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
     <div class="intro">
       <p class="eyebrow" style="color:var(--c-main)">Model 1</p>
       <h2>Trunk-based development</h2>
-      <p>Use it for internal products and services that deploy several times a day. There is one long-lived branch, <code>main</code>, and it must always be releasable. Every ticket lives on a branch for hours, or two days at most, then lands on <code>main</code>. Unfinished features hide behind feature flags. There is no <code>develop</code> or <code>uat</code> branch.</p>
+      <p>For internal products that deploy several times a day. <code>main</code> is the only long-lived branch and is always releasable. A ticket branch lives for hours, two days at most. Unfinished features sit behind feature flags.</p>
     </div>
     <div class="panel lab" id="lab-trunk"></div>
     <div class="panel pad critical" role="note">
       <p class="eyebrow tagbad">Critical rule</p>
       <h3>Never commit to a branch after its PR has been merged</h3>
-      <p>A squash merge leaves the branch's original commits unrelated to <code>main</code>. If the agent keeps working on that branch, git sees the old commits as new again. The next PR re-includes the work that already shipped and conflicts with the squash commit.</p>
-      <p><strong>Instead:</strong> delete the branch and worktree when the PR merges. For follow-up work, create a new branch and worktree from the latest <code>main</code>, for example <code>ticket/101-login-fix</code>.</p>
+      <p>After a squash merge, the branch's old commits are unrelated to <code>main</code>. New commits on that branch bring the shipped work back into the next PR and conflict with the squash commit.</p>
+      <p><strong>Instead:</strong> delete the branch and worktree when the PR merges. Start follow-up work on a new branch from the latest <code>main</code>.</p>
       <div class="cmd"><pre id="crit-cmd">git worktree add -b ticket/101-login-fix ../worktrees/101b origin/main</pre><button type="button" data-copy="crit-cmd">Copy</button></div>
     </div>
   </section>
@@ -278,13 +277,13 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
     <div class="intro">
       <p class="eyebrow" style="color:var(--c-rel)">Model 2</p>
       <h2>Selective promotion</h2>
-      <p>Use it for client work where each ticket has its own branch, tickets are tested together on UAT, and the client may release only some of them. The final pull request must still land on <code>main</code>.</p>
-      <p>At release time the person in charge cuts a fresh <code>release/*</code> branch from <code>main</code>. Each approved ticket gets its own PR into that branch and is squash-merged. Then one PR from the release branch lands on <code>main</code> using <em>Rebase and merge</em>, which appends the ticket commits with no merge commit. Choose which tickets the client approved, then step through. Keep the conflict scenario on to see where tickets that collide get sorted out.</p>
+      <p>For client work: one branch per ticket, testing on UAT, and the client may release only some tickets. The final PR must land on <code>main</code>.</p>
+      <p>At release, cut <code>release/*</code> from <code>main</code>. Each approved ticket gets a PR into it (squash merge). One final PR lands on <code>main</code> with <em>Rebase and merge</em>: one commit per ticket, no merge commit.</p>
     </div>
     <div class="panel lab" id="lab-sel"></div>
     <div class="panel pad" style="display:grid;gap:10px">
-      <h3>Why a release branch beats separate PRs</h3>
-      <p class="small">Compare the two modes above using the same approved tickets. With a release branch, conflicts between tickets are resolved once, in one place, and <code>main</code> gets exactly one clean commit per approved ticket. The final PR uses rebase and merge, so those commits are appended as they are and no merge commit appears. With separate PRs, each ticket must be rebased onto the result of the one before it, and the conflicts are resolved on <code>main</code> itself, one at a time, by hand, with nothing tested against them. A temporary release branch can be tested before it lands.</p>
+      <h3>Why not PRs straight to main?</h3>
+      <p class="small">Conflicts get fixed on <code>main</code> one PR at a time, by hand, and never tested on <code>uat</code>. A release branch lets you fix them once and test the result before it lands.</p>
     </div>
   </section>
 
@@ -292,7 +291,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
     <div class="intro">
       <p class="eyebrow">Side by side</p>
       <h2>Choose by project constraints</h2>
-      <p>Classic Git Flow, with long-lived <code>develop</code>, release and hotfix branches, adds too much overhead and merge pain when many agents produce changes at once. These two models keep the useful parts and drop the rest.</p>
+      <p>Git Flow (long-lived <code>develop</code>, release and hotfix branches) creates too much merge overhead for parallel agents. Pick by project constraints.</p>
     </div>
     <div class="panel tablewrap">
       <table>
@@ -301,13 +300,12 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
           <tr><th scope="row">Long-lived branches</th><td>Only <code>main</code></td><td><code>main</code> and <code>uat</code>, plus temporary <code>release/*</code></td></tr>
           <tr><th scope="row">Ticket branch lifetime</th><td>Hours to 1–2 days</td><td>Days, until the release decision</td></tr>
           <tr><th scope="row">Integration point</th><td>Straight into <code>main</code></td><td>Into <code>uat</code> first, later via release → <code>main</code></td></tr>
-          <tr><th scope="row">Partial release</th><td>Feature flags</td><td>Explicit: pick which ticket branches ship</td></tr>
-          <tr><th scope="row">Final landing on main</th><td>Direct PR from the ticket</td><td>One PR from the release branch, using rebase and merge</td></tr>
-          <tr><th scope="row">Merge commits on main</th><td>None, squash merge</td><td>None, squash into release, rebase and merge to main</td></tr>
-          <tr><th scope="row">Commits on main</th><td>One squash per ticket</td><td>One squash per selected ticket</td></tr>
+          <tr><th scope="row">Partial release</th><td>Feature flags</td><td>Pick which tickets ship</td></tr>
+          <tr><th scope="row">Final landing on main</th><td>PR from the ticket, squash merge</td><td>PR from the release branch, rebase and merge</td></tr>
+          <tr><th scope="row">Commits on main</th><td>One per ticket, no merge commits</td><td>One per approved ticket, no merge commits</td></tr>
           <tr><th scope="row">Deployment</th><td>Continuous, many per day</td><td>Scheduled batches</td></tr>
           <tr><th scope="row">Conflict risk</th><td>Low, branches are short</td><td>Concentrated on the release branch</td></tr>
-          <tr><th scope="row">Agents and worktrees</th><td>Excellent</td><td>Excellent, same isolation model</td></tr>
+          <tr><th scope="row">Agents and worktrees</th><td>Excellent</td><td>Excellent</td></tr>
           <tr><th scope="row">Best for</th><td>Internal products, high velocity</td><td>Client contracts with change control</td></tr>
         </tbody>
       </table>
@@ -316,7 +314,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       <div class="panel"><h3>Pick trunk-based when</h3><p>You own the product, deploy often, and can hide unfinished work behind flags.</p></div>
       <div class="panel"><h3>Pick selective promotion when</h3><p>A client tests on UAT and can approve some tickets while rejecting others.</p></div>
     </div>
-    <p class="small">Both keep ticket branches current by rebasing or merging from their base while they are active, use consistent names such as <code>ticket/&lt;id&gt;-short-desc</code>, and automate worktree creation and cleanup.</p>
+    <p class="small">Both keep branches current by rebasing, name them <code>ticket/&lt;id&gt;-short-desc</code>, and automate worktree setup and cleanup.</p>
   </section>
 
   <section id="quiz">
@@ -366,8 +364,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
     document.getElementById("wt-cmd").textContent = cmds.join("\n");
     document.getElementById("wt-add").disabled = nAgents >= AGENTS.length;
     document.getElementById("wt-remove").disabled = nAgents <= 1;
-    document.getElementById("wt-note").textContent = nAgents + (nAgents === 1 ? " agent" : " agents") +
-      ", " + nAgents + (nAgents === 1 ? " folder" : " folders") + ", one shared git history. Edits in one folder never touch another.";
+    document.getElementById("wt-note").textContent = nAgents + (nAgents === 1 ? " agent" : " agents") + ", one shared git history."
   }
   document.getElementById("wt-add").addEventListener("click", function () { if (nAgents < AGENTS.length) { nAgents++; renderWt(); } });
   document.getElementById("wt-remove").addEventListener("click", function () { if (nAgents > 1) { nAgents--; renderWt(); } });
@@ -480,7 +477,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       '<div class="stage"><div class="lanes"></div><div class="scroller"></div></div>' +
       '<div class="legend">' +
       '<span><svg viewBox="0 0 26 10"><path d="M0 5H26" stroke="var(--ink)" stroke-width="2.5"/></svg>parent link</span>' +
-      '<span><svg viewBox="0 0 26 10"><path d="M0 5H26" stroke="var(--ink)" stroke-width="2.5" stroke-dasharray="6 5"/></svg>squashed in (contents copied, no parent link)</span>' +
+      '<span><svg viewBox="0 0 26 10"><path d="M0 5H26" stroke="var(--ink)" stroke-width="2.5" stroke-dasharray="6 5"/></svg>squash merge (no parent link)</span>' +
       '<span><svg viewBox="0 0 26 10"><circle cx="13" cy="5" r="4" fill="var(--bg)" stroke="var(--ink)" stroke-width="2"/></svg>branch created</span></div>' +
       '<div class="stepbody"></div>' +
       '<div class="stepnav"><button class="back">Back</button><div class="dots" role="group" aria-label="Steps"></div><button class="primary next">Next step</button></div>';
@@ -521,41 +518,41 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
   var sync = "rebase";
   function trunkSteps() {
     var rb = sync === "rebase", st = [];
-    st.push({ title: "main is the only long-lived branch", text: "It must always be releasable. Anything on <code>main</code> could be deployed right now.",
+    st.push({ title: "main is the only long-lived branch", text: "It is always releasable.",
       ops: [{ t: "commit", b: "main", id: "A", tag: "always releasable" }] });
-    st.push({ title: "Give the agent its own worktree and branch", text: "Always branch from the latest <code>main</code>. The new folder is where the agent works, and nowhere else.",
+    st.push({ title: "Give the agent a worktree and branch", text: "Branch from the latest <code>main</code>. The agent works only in this folder.",
       cmd: "git worktree add -b " + T101 + " ../worktrees/101 origin/main",
       ops: [{ t: "branch", name: T101, from: "main" }] });
-    st.push({ title: "The agent commits while main moves on", text: "The agent commits in small, exploratory steps, B and C. Meanwhile a teammate lands X on <code>main</code>, and X touches some of the same lines as the ticket.",
-      note: "This is normal. Even with branches that live for hours, <code>main</code> keeps moving.",
+    st.push({ title: "The agent commits while main moves on", text: "The agent commits B and C. Meanwhile a teammate lands X on <code>main</code>, touching some of the same lines.",
+      note: "<code>main</code> keeps moving even when branches live for hours.",
       ops: [{ t: "commit", b: T101, id: "B" }, { t: "commit", b: T101, id: "C" }, { t: "commit", b: "main", id: "X", tag: "teammate lands" }] });
     if (rb) {
-      st.push({ title: "Rebase onto main and resolve the conflict now", text: "Rebase replays B and C on top of the current <code>main</code> as B′ and C′. Git stops where the ticket collides with X, and you resolve it here, in the branch, while the ticket is still fresh. Afterwards the branch contains only the ticket's changes, sitting directly on top of X.",
+      st.push({ title: "Rebase onto main and resolve the conflict", text: "Rebase replays B and C on top of X as B′ and C′. Git stops at the collision and you fix it here, in the branch. The branch then holds only the ticket's changes.",
         cmd: "git fetch origin\ngit rebase origin/main\n# on conflict: fix files, then\ngit add . && git rebase --continue\ngit push --force-with-lease -u origin " + T101,
-        note: "The old B and C are faded because rebase replaces them with new commits. <code>--force-with-lease</code> is needed for that and is safe on a branch only one agent owns. Then open the PR against <code>main</code>.",
+        note: "Old B and C fade because rebase replaces them. <code>--force-with-lease</code> is required and safe on a branch one agent owns. Then open the PR to <code>main</code>.",
         ops: [{ t: "rebase", b: T101, onto: "main", ids: ["B′", "C′"], tag: "conflict resolved" }] });
     } else {
-      st.push({ title: "Merging main into the branch (the common mistake)", text: "Instead of rebasing, the agent runs <code>git merge origin/main</code>. That adds a merge commit, MM, which carries X and the conflict resolution into the ticket branch. The branch history now mixes <code>main</code>'s code with the ticket's.",
+      st.push({ title: "Merging main into the branch (common mistake)", text: "<code>git merge origin/main</code> adds a merge commit, MM, that brings X and the conflict fix into the ticket branch.",
         cmd: "git fetch origin\ngit merge origin/main\n# on conflict: fix files, then\ngit commit\ngit push -u origin " + T101,
-        warn: "The PR now shows extra commits and changes that do not belong to the ticket, which makes review harder.",
+        warn: "The PR now shows changes that are not the ticket's, which makes review harder.",
         ops: [{ t: "merge", from: "main", into: T101, id: "MM", tag: "merge main", warn: true }] });
     }
     st.push({ title: "CI and review pass, then squash merge", text: rb
-        ? "B′ and C′ collapse into one commit, D, on <code>main</code>. The dashed line shows that D contains the ticket's work without having the ticket's commits as parents. Deploy straight from <code>main</code>."
-        : "B, C and MM collapse into one commit, D, on <code>main</code>. The dashed line shows that D contains the branch's work without having its commits as parents.",
-      note: rb ? "The branch already sits on top of current <code>main</code> and the conflict was settled in the previous step, so the squash applies cleanly. That is the payoff of rebasing first." : "",
-      warn: rb ? "" : "Squash does not record that the main code inside the branch is the same as the real commits on <code>main</code>. The branch's own commits stay unrelated to D, so the squash can conflict with <code>main</code> again, conflicts you already resolved in MM come back, and any branch or follow-up PR built on this one collides with <code>main</code>.",
+        ? "B′ and C′ collapse into one commit, D. The dashed line means D holds the ticket's work without its commits as parents."
+        : "B, C and MM collapse into D. The dashed line means D holds the branch's work without its commits as parents.",
+      note: rb ? "The branch already sits on <code>main</code> and the conflict is settled, so the squash applies cleanly." : "",
+      warn: rb ? "" : "The squash commit has no link to main's commits, so conflicts can reappear, and follow-up work on this branch collides with <code>main</code> again.",
       cmd: "# In your Git host: Squash and merge the PR into main",
-      ops: [{ t: "merge", from: T101, into: "main", id: "D", tag: rb ? "deploy" : "conflicts again", squash: true, warn: !rb }] });
-    st.push({ title: "Delete the branch and remove the worktree", text: "The ticket is done, so its branch and folder go away. Nothing long-lived is left behind.",
-      warn: "Do not commit to this branch again. A follow-up gets a new branch from main.",
+      ops: [{ t: "merge", from: T101, into: "main", id: "D", tag: rb ? "deploy" : "may conflict", squash: true, warn: !rb }] });
+    st.push({ title: "Delete the branch and remove the worktree", text: "The branch and folder are removed.",
+      warn: "Never commit to this branch again. Follow-ups get a new branch from main.",
       cmd: "git worktree remove ../worktrees/101\ngit branch -D " + T101 + "\ngit push origin --delete " + T101,
       ops: [{ t: "delete", b: T101 }] });
-    st.push({ title: "Run many agents at once", text: "Two more agents start from the new <code>main</code>. Each has its own worktree, so they cannot collide on disk.",
+    st.push({ title: "Run many agents at once", text: "Two more agents branch from the new <code>main</code>, each in its own worktree.",
       cmd: "git worktree add -b " + T102 + " ../worktrees/102 origin/main\ngit worktree add -b " + T103 + " ../worktrees/103 origin/main",
       ops: [{ t: "branch", name: T102, from: "main" }, { t: "commit", b: T102, id: "E" }, { t: "branch", name: T103, from: "main" }, { t: "commit", b: T103, id: "G" }] });
-    st.push({ title: "Each ticket lands when it is ready", text: "102 finishes first and deploys as F. 103 rebases onto F before its PR, then deploys as H. History on <code>main</code> stays one commit per ticket, in a straight line.",
-      note: "Because branches live for hours, the rebase is usually trivial. This is why conflict risk is low in this model.",
+    st.push({ title: "Each ticket lands when ready", text: "102 lands as F. 103 rebases onto F, then lands as H. <code>main</code> stays a straight line, one commit per ticket.",
+      note: "Short branches make the rebase trivial, so conflict risk stays low.",
       ops: [{ t: "merge", from: T102, into: "main", id: "F", tag: "deploy", squash: true }, { t: "merge", from: T103, into: "main", id: "H", tag: "deploy", squash: true }, { t: "delete", b: T102 }, { t: "delete", b: T103 }] });
     return st;
   }
@@ -569,27 +566,27 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
   /* ---------- baseline: merge everywhere ---------- */
   var B1 = "ticket/201-auth", B2 = "ticket/202-report", B3 = "ticket/203-export", PR = "production";
   var baseSteps = [
-    { title: "Two environment branches, both deployed by CI", text: "<code>production</code> deploys to production and <code>uat</code> deploys to the UAT environment. The team treats both as branches that people merge into. Here <code>production</code> plays the part <code>main</code> plays in the rest of this lesson.",
+    { title: "Two environment branches deployed by CI", text: "<code>production</code> deploys to production, <code>uat</code> to UAT. Here <code>production</code> plays the role of <code>main</code>.",
       ops: [{ t: "commit", b: PR, id: "P1", tag: "deploys to prod" }, { t: "branch", name: "uat", from: PR }] },
-    { title: "Three agents branch off and commit", text: "Each ticket gets its own branch. The agents commit in small steps.",
+    { title: "Three agents branch off and commit", text: "One branch per ticket.",
       ops: [{ t: "branch", name: B1, from: PR }, { t: "commit", b: B1, id: "a1" }, { t: "commit", b: B1, id: "a2" }, { t: "branch", name: B2, from: PR }, { t: "commit", b: B2, id: "b1" }, { t: "branch", name: B3, from: PR }, { t: "commit", b: B3, id: "c1" }] },
-    { title: "Every ticket is merged into uat", text: "Plain merges into <code>uat</code>, and CI deploys it for the client to test.",
+    { title: "Every ticket is merged into uat", text: "Plain merges. CI deploys <code>uat</code> for client testing.",
       cmd: "git switch uat\ngit merge " + B1 + "\ngit merge " + B2 + "\ngit merge " + B3,
       ops: [{ t: "merge", from: B1, into: "uat", id: "U1" }, { t: "merge", from: B2, into: "uat", id: "U2" }, { t: "merge", from: B3, into: "uat", id: "U3", tag: "UAT" }] },
-    { title: "A hotfix lands, so everything merges production in", text: "A production hotfix, H, goes out. Now every open ticket branch and <code>uat</code> must merge <code>production</code> in to stay current. That is four merge commits that carry no work of their own.",
+    { title: "A hotfix lands, so everything merges production in", text: "Hotfix H ships. Every open ticket branch and <code>uat</code> merges <code>production</code> in: four merge commits with no work of their own.",
       cmd: "git switch " + B1 + " && git merge production   # and again for 202, 203\ngit switch uat && git merge production",
-      warn: "Every PR diff now mixes production's code with the ticket's.",
+      warn: "Each PR diff now mixes production's code with the ticket's.",
       ops: [{ t: "commit", b: PR, id: "H", tag: "hotfix" }, { t: "merge", from: PR, into: B1, id: "m1", tag: "merge prod", warn: true }, { t: "merge", from: PR, into: B2, id: "m2", tag: "merge prod", warn: true }, { t: "merge", from: PR, into: B3, id: "m3", tag: "merge prod", warn: true }, { t: "merge", from: PR, into: "uat", id: "s1", tag: "sync uat", warn: true }] },
-    { title: "The client approves 201 and 203, and rejects 202", text: "Merging <code>uat</code> into <code>production</code> would ship ticket 202 as well, because it is already inside <code>uat</code>. So each approved ticket is merged straight into <code>production</code>, and any conflict between 201 and 203 is fixed there by hand, in a merge that was never tested on <code>uat</code>.",
+    { title: "The client approves 201 and 203, rejects 202", text: "<code>uat</code> already contains 202, so it cannot be merged into <code>production</code>. Each approved ticket is merged straight into <code>production</code>. Any conflict between 201 and 203 is fixed there by hand, untested on <code>uat</code>.",
       cmd: "git switch production\ngit merge " + B1 + "\ngit merge " + B3,
-      warn: "Production now holds merge commits and fixes that UAT never saw.",
+      warn: "Production now holds merges and fixes that UAT never saw.",
       ops: [{ t: "merge", from: B1, into: PR, id: "R1", tag: "merge", warn: true }, { t: "merge", from: B3, into: PR, id: "R2", tag: "merge", warn: true }] },
-    { title: "Then uat has to be synced back", text: "<code>production</code> changed, so <code>uat</code> merges it back, with yet another merge commit. And <code>uat</code> still contains rejected ticket 202, so it no longer matches <code>production</code> plus what is pending.",
+    { title: "uat has to be synced back", text: "<code>production</code> changed, so <code>uat</code> merges it back (another merge commit). <code>uat</code> still contains rejected 202.",
       cmd: "git switch uat && git merge production",
       ops: [{ t: "merge", from: PR, into: "uat", id: "s2", tag: "sync back", warn: true }] },
-    { title: "Count the damage", text: "<code>production</code> holds <strong>9 commits</strong> for 2 shipped tickets. Only 5 are real work: the first commit, the hotfix, and three ticket commits. <strong>4 are merge commits</strong> (m1, m3, R1, R2, in red). <code>uat</code> carries 5 more of its own.",
-      warn: "Reverting one ticket means reverting a merge and untangling the production code merged into it. Both environment branches must be synced in both directions after every release. Rejected code lives on in <code>uat</code>. Conflict fixes reach production untested.",
-      note: "Now compare. In trunk-based development, <code>main</code> gets 1 commit per ticket and 0 merge commits. Selective promotion ends with the same result, and <code>uat</code> is reset after each release.",
+    { title: "Count the damage", text: "<code>production</code> has <strong>9 commits</strong> for 2 shipped tickets: 5 real changes and <strong>4 merge commits</strong> (red). <code>uat</code> adds 5 more merge commits.",
+      warn: "Reverting a ticket means reverting a merge. Both branches need syncing after every release. Rejected code stays in <code>uat</code>. Conflict fixes reach production untested.",
+      note: "Compare: trunk-based and selective promotion both give <code>main</code> one commit per ticket and no merge commits.",
       ops: [] }
   ];
   Lab(document.getElementById("lab-base"), { steps: function () { return baseSteps; } });
@@ -611,7 +608,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
   function selSteps() {
     var sel = chosen(), rej = TICKETS.filter(function (t) { return !selected[t.id]; });
     var st = [];
-    st.push({ title: "Production starts at main", text: "<code>main</code> is what the client runs in production. It only changes at a release.",
+    st.push({ title: "main is production", text: "It only changes at a release.",
       ops: [{ t: "commit", b: "main", id: "M1", tag: "production" }] });
     var tOps = [], tCmd = [];
     TICKETS.forEach(function (t) {
@@ -619,50 +616,50 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       t.c.forEach(function (id) { tOps.push({ t: "commit", b: t.n, id: id }); });
       tCmd.push("git worktree add -b " + t.n + " ../worktrees/" + t.id + " origin/main");
     });
-    st.push({ title: "Three tickets, three worktrees, three branches", text: "Every ticket gets its own branch from <code>main</code>, and an agent works on each in isolation. Branches stay open for days, until the release decision.",
+    st.push({ title: "Three tickets, three worktrees", text: "Each ticket branches from <code>main</code> and stays open until the release decision.",
       cmd: tCmd.join("\n"), ops: tOps });
     var uOps = [{ t: "branch", name: "uat", from: "main" }];
     TICKETS.forEach(function (t, k) { uOps.push({ t: "merge", from: t.n, into: "uat", id: "U" + (k + 1), tag: k === 2 ? "UAT testing" : undefined }); });
-    st.push({ title: "Merge each ticket into uat for testing", text: "<code>uat</code> is the shared test environment. These are ordinary merges, because <code>uat</code> is disposable and never lands on <code>main</code>.",
-      note: conflictOn ? "Tickets 201 and 203 edit the same line. Do not patch that in either ticket branch, because each fix would need the other ticket's code, and the two would depend on each other. It is settled later, in a temporary branch, only if both tickets ship." : "",
+    st.push({ title: "Merge each ticket into uat", text: "<code>uat</code> is the shared test branch. Plain merges are fine here: it is disposable and never lands on <code>main</code>.",
+      note: conflictOn ? "201 and 203 edit the same line. Do not fix it in either ticket branch: each fix would need the other ticket's code. It is resolved later, on the release branch, only if both ship." : "",
       cmd: "git switch uat\n" + TICKETS.map(function (t) { return "git merge " + t.n; }).join("\n") + "\ngit push origin uat", ops: uOps });
-    st.push({ title: "The client tests and chooses", text: "Approved for release: <strong>" + names(sel) + "</strong>." + (rej.length ? " Not this time: <strong>" + names(rej) + "</strong>. That branch stays open and can ship in a later release." : " Everything was approved."),
-      note: "The two checkboxes and the mode switch above change what happens next. Try approving a different set.", ops: [] });
+    st.push({ title: "The client picks", text: "Approved: <strong>" + names(sel) + "</strong>." + (rej.length ? " Not this time: <strong>" + names(rej) + "</strong> (stays open for a later release)." : " Everything was approved."),
+      note: "Change the approvals or the landing mode above to see the effect.", ops: [] });
 
     if (mode === "release") {
-      st.push({ title: "Cut a fresh release branch from main", text: "The PIC starts from the latest <code>main</code>, not from <code>uat</code>. That keeps rejected tickets out entirely. Each approved ticket will now get its own PR into this branch.",
+      st.push({ title: "Cut a release branch from main", text: "Branch from the latest <code>main</code>, not <code>uat</code>, so rejected tickets stay out. Each approved ticket gets a PR into this branch.",
         cmd: "git fetch origin\ngit switch -c " + REL + " origin/main\ngit push -u origin " + REL, ops: [{ t: "branch", name: REL, from: "main" }] });
       var bothShip = conflictOn && selected["201"] && selected["203"];
       sel.forEach(function (t, k) {
         var clash = bothShip && t.id === "203";
         var lone = conflictOn && !bothShip && (t.id === "201" || t.id === "203");
         if (clash) {
-          st.push({ title: "Rebase " + t.n + " onto the release branch", text: "<strong>Conflict.</strong> This ticket edits the same line as ticket/201-auth, which is already on the release branch. Rebase the ticket onto <code>release/*</code> and fix the line once. The old commit fades and a new one, T3a′, sits on top of R1. The fix is tested by CI on this PR, and <code>main</code> is not touched.",
-            warn: "Rebase, do not merge the release branch into the ticket. Merging adds code that does not belong to the ticket and brings back the squash-merge mistake.",
+          st.push({ title: "Rebase " + t.n + " onto the release branch", text: "<strong>Conflict.</strong> 203 edits the same line as 201, which is already on the release branch. Rebase 203 onto <code>release/*</code> and fix the line once. CI tests the fix on the PR, and <code>main</code> is untouched.",
+            warn: "Rebase. Do not merge the release branch into the ticket.",
             cmd: "git switch " + t.n + "\ngit rebase origin/" + REL + "\n# CONFLICT in src/export.ts: fix it, then\ngit add src/export.ts && git rebase --continue\ngit push --force-with-lease",
             ops: [{ t: "rebase", b: t.n, onto: REL, ids: t.c.map(function (id) { return id + "′"; }), tag: "conflict resolved" }] });
         }
-        st.push({ title: "PR " + t.n + " → release, squash merge", text: "Open a PR with <code>" + REL + "</code> as the target. CI and review run on it, and the agent's commits collapse into one on the release branch." + (k === 0 ? " Land tickets in a sensible order: least conflicting first, or by dependency." : "") + (clash ? " The branch is already rebased, so this PR is clean." : ""),
-          note: lone ? "No conflict this time. " + t.n + " collided with " + (t.id === "201" ? "ticket/203-export" : "ticket/201-auth") + ", which is not shipping. Conflicts only matter between tickets that ship together." : "",
+        st.push({ title: "PR " + t.n + " → release, squash merge", text: "Open a PR into <code>" + REL + "</code> and squash merge. CI and review run on it." + (k === 0 ? " Order tickets by least conflict or by dependency." : "") + (clash ? " The branch is already rebased, so this PR is clean." : ""),
+          note: lone ? "No conflict: " + (t.id === "201" ? "ticket/203-export" : "ticket/201-auth") + " is not shipping. Conflicts only matter between tickets that ship together." : "",
           cmd: "# Open a PR: " + t.n + " → " + REL + "\n# In your Git host: Squash and merge",
           ops: [{ t: "commit", b: REL, id: "R" + (k + 1), tag: t.tag }, { t: "_squashedge", from: t.n }] });
       });
-      st.push({ title: "One release PR → main, Rebase and merge", text: "This is the pull request the client contract requires. Merge it with <strong>Rebase and merge</strong>. Each ticket commit is appended to <code>main</code> as it is, so <code>main</code> gains exactly <strong>" + sel.length + "</strong> commit" + (sel.length > 1 ? "s" : "") + " and <strong>no merge commit</strong>.",
+      st.push({ title: "One release PR → main, Rebase and merge", text: "Merge with <strong>Rebase and merge</strong>. <code>main</code> gains <strong>" + sel.length + "</strong> commit" + (sel.length > 1 ? "s" : "") + " and <strong>no merge commit</strong>.",
         cmd: "# Open a PR: " + REL + " → main\n# In your Git host: Rebase and merge",
-        warn: "Do not squash this PR. It would collapse your " + sel.length + " ticket commits into one.",
-        note: (bothShip ? "Run CI and a quick UAT check on the release branch first: it is the first place the combined, resolved code exists. " : "") + "The host creates new commits when it rebases, so they get new hashes (marked with ′). The release branch is finished after this. Delete it and never reuse it. If <code>main</code> moved during the release, rebase the release branch onto it first.",
+        warn: "Do not squash this PR. It would collapse the " + sel.length + " ticket commits into one.",
+        note: (bothShip ? "Run CI and a UAT check on the release branch first: it is the first place the combined code exists. " : "") + "Rebasing creates new hashes (′). Delete the release branch afterwards and never reuse it. If <code>main</code> moved during the release, rebase the release branch onto it first.",
         ops: [{ t: "land", from: REL, into: "main", tag: "rebase and merge" }] });
       var cl = [{ t: "delete", b: REL }, { t: "delete", b: "uat", note: "reset" }];
       TICKETS.forEach(function (t) { if (selected[t.id]) cl.push({ t: "delete", b: t.n }); });
-      st.push({ title: "Clean up and reset uat", text: "Shipped ticket branches and their worktrees are removed. Resetting <code>uat</code> to <code>main</code> stops rejected tickets from piling up there." + (rej.length ? " The branch for " + names(rej) + " stays open for the next release." : ""),
+      st.push({ title: "Clean up and reset uat", text: "Remove shipped ticket branches and worktrees. Reset <code>uat</code> to <code>main</code> so rejected tickets do not accumulate." + (rej.length ? " The branch for " + names(rej) + " stays open." : ""),
         cmd: sel.map(function (t) { return "git worktree remove ../worktrees/" + t.id; }).join("\n") + "\ngit switch uat && git reset --hard origin/main\ngit push --force-with-lease origin uat", ops: cl });
     } else {
       sel.forEach(function (t, k) {
-        st.push({ title: "Open a separate PR for " + t.n + " → main", text: k === 0 ? "No release branch. Each approved ticket gets its own PR straight to <code>main</code>." : "This PR was based on the old <code>main</code>. It now has to be rebased onto the result of the previous PR before it can land.",
-          warn: k === 0 ? "" : "Conflicts with the earlier PRs are resolved on <code>main</code> itself, by hand. That fix was never tested on <code>uat</code>, so a mistake goes straight to production.",
+        st.push({ title: "Separate PR for " + t.n + " → main", text: k === 0 ? "No release branch. Each approved ticket gets its own PR to <code>main</code>." : "This PR must be rebased onto the previous result before it lands.",
+          warn: k === 0 ? "" : "The conflict is fixed on <code>main</code> by hand, untested on <code>uat</code>. A mistake reaches production.",
           ops: [{ t: "merge", from: t.n, into: "main", id: "M" + (k + 2), tag: "PR " + t.id + " → main", squash: true, warn: k > 0 }] });
       });
-      st.push({ title: "It works, but it is the harder path", text: "<code>main</code> ends up with the same " + sel.length + " commits, but you resolved conflicts " + (sel.length > 1 ? "sequentially, in " + sel.length + " separate PRs, directly on the production branch" : "directly on the production branch") + ". The order is also fixed by merge timing instead of being chosen on a staging branch. A conflict fix made here by hand was never tested on <code>uat</code>, so what lands on <code>main</code> can differ from what the client approved.",
+      st.push({ title: "Same commits, harder path", text: "<code>main</code> ends with the same " + sel.length + " commit" + (sel.length > 1 ? "s" : "") + ", but conflicts were fixed one PR at a time on the production branch, and the fix was never tested on <code>uat</code>.",
         note: "Switch back to “PRs into a release branch” to compare.", ops: [] });
     }
     return st;
@@ -704,36 +701,36 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
 
   /* ---------- quiz ---------- */
   var QS = [
-    { q: "An internal SaaS dashboard deploys ten times a day and the team owns the whole product. Which model fits?",
+    { q: "An internal product deploys ten times a day. Which model fits?",
       o: ["Trunk-based development", "Selective promotion", "Git Flow with a long-lived develop branch"], a: 0,
-      why: "Frequent deploys, one owner, and flags for unfinished work are exactly what trunk-based is for." },
-    { q: "A client tests five tickets on UAT and approves only two for Friday's release. Which model fits?",
+      why: "Frequent deploys, one owner and feature flags fit trunk-based." },
+    { q: "A client tests five tickets on UAT and approves two for release. Which model fits?",
       o: ["Trunk-based development", "Selective promotion", "Either, there is no difference"], a: 1,
-      why: "The client choosing some tickets after testing is the defining requirement of selective promotion." },
-    { q: "In trunk-based development, how do you merge a half-finished feature without breaking a releasable main?",
+      why: "The client choosing tickets after testing defines selective promotion." },
+    { q: "In trunk-based development, how do you merge a half-finished feature safely?",
       o: ["Keep the branch open for a month", "Hide it behind a feature flag", "Merge it into a develop branch"], a: 1,
-      why: "Flags let incomplete work land on main without being visible to users, so branches stay short." },
+      why: "Flags let unfinished work land on main without being visible, so branches stay short." },
     { q: "Which branch does the final pull request target in selective promotion?",
       o: ["uat", "develop", "main, from the release branch"], a: 2,
-      why: "The client contract requires the final PR to land on main. It comes from release/YYYY-MM-DD." },
+      why: "The final PR must land on main. It comes from release/YYYY-MM-DD." },
     { q: "Why do approved tickets get PRs into a release branch instead of straight to main?",
       o: ["It makes the branches shorter-lived", "Conflicts between tickets are resolved, and the combination tested, before anything touches main", "It removes the need for CI"], a: 1,
-      why: "Straight-to-main PRs force sequential conflict resolution on the production branch. The release branch is a temporary place to resolve and test the combination." },
+      why: "Straight-to-main PRs fix conflicts one by one on production. A release branch fixes and tests them once, first." },
     { q: "Which merge method should the final release → main PR use?",
       o: ["Squash and merge", "Rebase and merge", "Create a merge commit"], a: 1,
-      why: "Rebase and merge appends each ticket commit to main as it is. Squash would collapse them into one, and a merge commit adds noise." },
-    { q: "A ticket's PR was squash-merged yesterday. The agent finds a small bug in it. What should it do?",
+      why: "Rebase and merge appends each ticket commit. Squash collapses them into one, and a merge commit adds noise." },
+    { q: "A ticket's PR was squash-merged. The agent finds a bug in it. What now?",
       o: ["Commit the fix to the same branch and open another PR", "Create a new branch from the latest main and fix it there", "Merge main into the old branch first, then commit"], a: 1,
-      why: "A merged branch is finished. Its old commits are unrelated to the squash commit on main, so reusing it re-includes shipped work and causes conflicts." },
-    { q: "Two approved tickets edit the same line, so neither ticket branch can be fixed alone. Where is the conflict resolved?",
+      why: "A merged branch is finished. Its commits are unrelated to the squash commit, so reuse re-includes shipped work." },
+    { q: "Two approved tickets edit the same line. Where is the conflict resolved?",
       o: ["Merge one ticket branch into the other", "In the PR into the release branch, by rebasing the ticket onto it", "Directly on main after the release PR"], a: 1,
-      why: "Ticket branches stay independent so a rejected ticket never leaks into another. The conflict is resolved once, on the way into the temporary release branch, where CI tests it. Fixing it by hand on main risks human mistakes and code that was never tested like uat was." },
+      why: "Ticket branches stay independent, so a rejected ticket never leaks into another. CI tests the fix on the release branch. A hand fix on main risks mistakes and untested code." },
     { q: "What is the main reason for one worktree per ticket?",
-      o: ["Real filesystem isolation, so agents run in parallel without clobbering each other", "It makes git push faster", "It lets two agents share the same branch safely"], a: 0,
-      why: "Each worktree is its own folder with its own checked-out branch, all sharing one repository." },
+      o: ["Filesystem isolation, so parallel agents do not overwrite each other", "It makes git push faster", "It lets two agents share the same branch safely"], a: 0,
+      why: "Each worktree is its own folder with its own branch, all sharing one repository." },
     { q: "After a release in selective promotion, what should you do with uat?",
       o: ["Leave it so rejected tickets keep accumulating", "Reset or rebuild it from main", "Delete it permanently"], a: 1,
-      why: "Resetting uat stops rejected or stale tickets from piling up and muddying the next round of testing." }
+      why: "Resetting uat stops rejected tickets from accumulating." }
   ];
   var qi = 0, score = 0, answered = false;
   var box = document.getElementById("quiz-box");
