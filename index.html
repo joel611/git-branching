@@ -194,6 +194,9 @@ tbody tr:hover { background: var(--accent-soft); }
 .opts button { text-align: left; padding: 12px 14px; line-height: 1.4; }
 .opts button.right { border-color: var(--good); background: color-mix(in srgb, var(--good) 14%, var(--surface)); }
 .opts button.wrong { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 12%, var(--surface)); }
+.scen { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.scen .stage { border-bottom: 0; }
+.scen-desc { max-width: 66ch; }
 .fb { padding: 12px 14px; border-radius: 8px; background: var(--bg); font-size: .94rem; }
 .score { font-family: var(--f-display); font-size: 2.6rem; font-weight: 700; }
 
@@ -329,7 +332,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
   <section id="quiz">
     <div class="intro">
       <p class="eyebrow">Check yourself</p>
-      <h2>Ten questions</h2>
+      <h2 id="quiz-title">Quiz</h2>
     </div>
     <div class="panel quiz" id="quiz-box"></div>
   </section>
@@ -802,7 +805,40 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       o: ["Leave it so rejected tickets keep accumulating", "Reset or rebuild it from main", "Delete it permanently"], a: 1,
       why: "Resetting uat stops rejected tickets from accumulating." }
   ];
+  /* scenario questions: g = graph ops, d = situation shown above the graph, q = "what next?" */
+  var S101 = "ticket/101-login", S102 = "ticket/102-api", S103 = "ticket/103-ui";
+  var SCEN = [
+    { d: "Agent 1 finished ticket 101 and opened a PR to main. While it worked, a teammate landed X on main, touching some of the same lines. The PR shows a conflict.",
+      g: [{ t: "commit", b: "main", id: "A" }, { t: "branch", name: S101, from: "main" }, { t: "commit", b: S101, id: "B" }, { t: "commit", b: S101, id: "C", tag: "PR: conflicts", warn: true }, { t: "commit", b: "main", id: "X", tag: "teammate lands" }],
+      q: "What is the next action?",
+      o: ["Merge origin/main into the ticket branch and push", "Rebase onto origin/main, fix the conflict, then force push with lease", "Squash merge anyway and fix the conflict on main", "Delete the branch and have the agent start again"], a: 1,
+      why: "Rebase replays the ticket's commits on top of main so the PR holds only the ticket's changes. A merge commit mixes main's code into the PR, and a hand fix on main is untested." },
+    { d: "Tickets 102 and 103 ran in parallel. 102 was squash merged into main as F and its branch deleted. 103 is finished, but its PR now says the branch is out of date with main.",
+      g: [{ t: "commit", b: "main", id: "A" }, { t: "branch", name: S102, from: "main" }, { t: "commit", b: S102, id: "E" }, { t: "branch", name: S103, from: "main" }, { t: "commit", b: S103, id: "G", tag: "feature done" }, { t: "merge", from: S102, into: "main", id: "F", tag: "staging/UAT", squash: true }, { t: "delete", b: S102 }],
+      q: "What is the next action?",
+      o: ["Rebase ticket/103-ui onto origin/main, then let CI re-run on the PR", "Cherry-pick F into the 103 branch by hand", "Merge ticket/103-ui into main without updating it", "Reopen ticket/102-api and push to it again"], a: 0,
+      why: "Each ticket lands one at a time, so the next one rebases onto the new main. The rebase is trivial because branches are short, and main stays a straight line." },
+    { d: "uat holds tickets 201, 202 and 203, all plain merged for testing. The client approved 201 and 203 and rejected 202. main is production.",
+      g: [{ t: "commit", b: "main", id: "M1", tag: "production" }, { t: "branch", name: "ticket/201-auth", from: "main" }, { t: "commit", b: "ticket/201-auth", id: "T1a" }, { t: "branch", name: "ticket/202-report", from: "main" }, { t: "commit", b: "ticket/202-report", id: "T2a" }, { t: "branch", name: "ticket/203-export", from: "main" }, { t: "commit", b: "ticket/203-export", id: "T3a" }, { t: "branch", name: "uat", from: "main" }, { t: "merge", from: "ticket/201-auth", into: "uat", id: "U1" }, { t: "merge", from: "ticket/202-report", into: "uat", id: "U2" }, { t: "merge", from: "ticket/203-export", into: "uat", id: "U3", tag: "UAT" }],
+      q: "What is the next action?",
+      o: ["Merge uat into main", "Revert 202 on uat, then merge uat into main", "Cut a release branch from main and open a PR per approved ticket into it", "Open PRs for 201 and 203 straight to main"], a: 2,
+      why: "uat already contains 202, so it can never go to main. Branch from main so the rejected ticket stays out, and fix and test any conflict once on the release branch." },
+    { d: "Release branch release/2026-10-23 already has 201 squashed in as R1. Ticket 203 edits the same line as 201, so its PR into the release branch shows a conflict.",
+      g: [{ t: "commit", b: "main", id: "M1", tag: "production" }, { t: "branch", name: "ticket/201-auth", from: "main" }, { t: "commit", b: "ticket/201-auth", id: "T1a" }, { t: "branch", name: "ticket/203-export", from: "main" }, { t: "commit", b: "ticket/203-export", id: "T3a", tag: "PR: conflicts", warn: true }, { t: "branch", name: REL, from: "main" }, { t: "merge", from: "ticket/201-auth", into: REL, id: "R1", tag: "squash 201", squash: true }],
+      q: "What is the next action?",
+      o: ["Merge ticket/201-auth into ticket/203-export", "Rebase ticket/203-export onto the release branch, fix the line once, force push with lease", "Squash merge the PR and fix the conflict on main later", "Merge the release branch into ticket/203-export"], a: 1,
+      why: "The conflict is fixed in the ticket branch by rebasing onto the release branch, and CI tests the fix on the PR. Merging tickets into each other would leak a rejected ticket's code. main is untouched." },
+    { d: "The release PR was merged with Rebase and merge. main now has two new commits. The release branch and ticket branches are deleted, but uat still holds the merges from before the release.",
+      g: [{ t: "commit", b: "main", id: "M1" }, { t: "branch", name: "ticket/201-auth", from: "main" }, { t: "commit", b: "ticket/201-auth", id: "T1a" }, { t: "branch", name: "ticket/203-export", from: "main" }, { t: "commit", b: "ticket/203-export", id: "T3a" }, { t: "branch", name: "uat", from: "main" }, { t: "merge", from: "ticket/201-auth", into: "uat", id: "U1" }, { t: "merge", from: "ticket/203-export", into: "uat", id: "U2", tag: "stale" }, { t: "branch", name: REL, from: "main" }, { t: "merge", from: "ticket/201-auth", into: REL, id: "R1", squash: true }, { t: "merge", from: "ticket/203-export", into: REL, id: "R2", squash: true }, { t: "land", from: REL, into: "main", tag: "rebase and merge" }, { t: "delete", b: REL }, { t: "delete", b: "ticket/201-auth" }, { t: "delete", b: "ticket/203-export" }],
+      q: "What is the next action?",
+      o: ["Leave uat as it is", "Merge main into uat", "Reset uat to origin/main and force push with lease", "Delete uat permanently"], a: 2,
+      why: "uat is disposable. Resetting it to main drops old merges and any rejected tickets, so the next cycle starts clean." }
+  ];
+  QS = QS.concat(SCEN);
+  /* put the scenarios between the concept questions so the quiz mixes both */
+  QS = [QS[10], QS[0], QS[1], QS[11], QS[2], QS[3], QS[12], QS[4], QS[5], QS[13], QS[6], QS[7], QS[14], QS[8], QS[9]];
   var qi = 0, score = 0, answered = false;
+  document.getElementById("quiz-title").textContent = QS.length + " questions";
   var box = document.getElementById("quiz-box");
   function renderQ() {
     if (qi >= QS.length) {
@@ -814,7 +850,13 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
     answered = false;
     var q = QS[qi];
     box.innerHTML = '<div class="qmeta"><span>Question ' + (qi + 1) + " of " + QS.length + '</span><span>Score ' + score + '</span></div><div class="bar"><div style="width:' + (qi / QS.length * 100) + '%"></div></div>' +
+      (q.g ? '<p class="kicker">Scenario</p><p class="scen-desc">' + esc(q.d) + '</p><div class="scen"><div class="stage"><div class="lanes"></div><div class="scroller"></div></div></div>' : "") +
       "<h3>" + esc(q.q) + '</h3><div class="opts">' + q.o.map(function (t, k) { return '<button data-k="' + k + '">' + esc(t) + "</button>"; }).join("") + '</div><div id="q-fb" aria-live="polite"></div>';
+    if (q.g) {
+      var sc = box.querySelector(".scen .stage");
+      drawGraph(build(q.g.map(function (o) { var c = {}; for (var p in o) c[p] = o[p]; c.s = 0; return c; })), -1, sc);
+      var sr = sc.querySelector(".scroller"); sr.scrollLeft = sr.scrollWidth;
+    }
     box.querySelector(".opts").addEventListener("click", function (e) {
       var b = e.target.closest("button"); if (!b || answered) return;
       answered = true;
