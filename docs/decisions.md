@@ -28,6 +28,7 @@ Each entry gives the decision, the reason, and the alternative rejected.
 | 22 | Restrict merge methods per branch with rulesets where the host supports it | Turns the merge-method rule into something enforced, not remembered | Relying on memory |
 | 23 | Use `ticket/<id>-short-desc` and `release/YYYY-MM-DD` naming | Consistency, easy automation | Free-form names |
 | 24 | The `uat` / `production` plain-merge flow is the baseline we move away from | Merge commits everywhere, two-way syncing, untested conflict fixes, rejected code stuck in `uat` | Keeping it |
+| 25 | Trunk-based: `main` deploys to staging/UAT, and a `v*` tag on `main` triggers the production release | One branch serves both environments, production is an explicit, auditable, rollback-friendly action, and the tag names the exact commit shipped | A long-lived `uat` or `production` branch; deploying every merge straight to production |
 
 ## Open items
 

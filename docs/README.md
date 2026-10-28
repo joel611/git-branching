@@ -9,7 +9,7 @@ An interactive lesson that walks through all of this lives in [`../index.html`](
 | File | What it covers |
 |------|----------------|
 | [principles.md](principles.md) | Rules shared by every strategy |
-| [strategy-trunk-based.md](strategy-trunk-based.md) | Trunk-based development, for internal products and continuous deployment |
+| [strategy-trunk-based.md](strategy-trunk-based.md) | Trunk-based development: `main` is staging/UAT, a tag releases to production |
 | [strategy-selective-promotion.md](strategy-selective-promotion.md) | Selective promotion, for client work with UAT and partial releases |
 | [baseline-merge-everywhere.md](baseline-merge-everywhere.md) | The `uat` / `production` plain-merge flow we are moving away from |
 | [decisions.md](decisions.md) | Every decision made, with the reason and the alternative rejected |

@@ -269,7 +269,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
     <div class="intro">
       <p class="eyebrow" style="color:var(--c-main)">Model 1</p>
       <h2>Trunk-based development</h2>
-      <p>For internal products that deploy several times a day. <code>main</code> is the only long-lived branch and is always releasable. A ticket branch lives for hours, two days at most. Unfinished features sit behind feature flags.</p>
+      <p>For internal products that deploy several times a day. <code>main</code> is the only long-lived branch and is always releasable. A ticket branch lives for hours, two days at most. Unfinished features sit behind feature flags. <code>main</code> deploys to staging/UAT on every merge, and pushing a version tag such as <code>v1.4.0</code> releases that commit to production.</p>
     </div>
     <div class="panel lab" id="lab-trunk"></div>
     <div class="panel pad critical" role="note">
@@ -305,13 +305,13 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       <table>
         <thead><tr><th></th><th class="c1">Trunk-based</th><th class="c2">Selective promotion</th></tr></thead>
         <tbody>
-          <tr><th scope="row">Long-lived branches</th><td>Only <code>main</code></td><td><code>main</code> and <code>uat</code>, plus temporary <code>release/*</code></td></tr>
+          <tr><th scope="row">Long-lived branches</th><td>Only <code>main</code> (staging/UAT); production by tag</td><td><code>main</code> and <code>uat</code>, plus temporary <code>release/*</code></td></tr>
           <tr><th scope="row">Ticket branch lifetime</th><td>Hours to 1–2 days</td><td>Days, until the release decision</td></tr>
           <tr><th scope="row">Integration point</th><td>Straight into <code>main</code></td><td>Into <code>uat</code> first, later via release → <code>main</code></td></tr>
           <tr><th scope="row">Partial release</th><td>Feature flags</td><td>Pick which tickets ship</td></tr>
           <tr><th scope="row">Final landing on main</th><td>PR from the ticket, squash merge</td><td>PR from the release branch, rebase and merge</td></tr>
           <tr><th scope="row">Commits on main</th><td>One per ticket, no merge commits</td><td>One per approved ticket, no merge commits</td></tr>
-          <tr><th scope="row">Deployment</th><td>Continuous, many per day</td><td>Scheduled batches</td></tr>
+          <tr><th scope="row">Deployment</th><td>Every merge to staging/UAT, tag to release to production</td><td>Scheduled batches</td></tr>
           <tr><th scope="row">Conflict risk</th><td>Low, branches are short</td><td>Concentrated on the release branch</td></tr>
           <tr><th scope="row">Agents and worktrees</th><td>Excellent</td><td>Excellent</td></tr>
           <tr><th scope="row">Best for</th><td>Internal products, high velocity</td><td>Client contracts with change control</td></tr>
@@ -423,6 +423,8 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
           nodes.push(n); (hist[op.b] = hist[op.b] || []).push(n); edges.push({ a: prev, b: n, color: n.color, out: k === 0 }); prev = n;
         });
         tip[op.b] = prev;
+      } else if (op.t === "tag") {
+        tip[op.b].tag = op.tag;
       } else if (op.t === "delete") {
         var l = lanes[laneOf[op.b]]; l.deleted = true; l.note = op.note || "merged";
       }
@@ -573,17 +575,21 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       note: rb ? "The branch already sits on <code>main</code> and the conflict is settled, so the squash applies cleanly." : "",
       warn: rb ? "" : "The squash commit has no link to main's commits, so conflicts can reappear, and follow-up work on this branch collides with <code>main</code> again.",
       cmd: "# In your Git host: Squash and merge the PR into main",
-      ops: [{ t: "merge", from: T101, into: "main", id: "D", tag: rb ? "deploy" : "may conflict", squash: true, warn: !rb }] });
+      ops: [{ t: "merge", from: T101, into: "main", id: "D", tag: rb ? "staging/UAT" : "may conflict", squash: true, warn: !rb }] });
     st.push({ title: "Delete the branch and remove the worktree", text: "The branch and folder are removed.",
       warn: "Never commit to this branch again. Follow-ups get a new branch from main.",
       cmd: "git worktree remove ../worktrees/101\ngit branch -D " + T101 + "\ngit push origin --delete " + T101,
       ops: [{ t: "delete", b: T101 }] });
+    st.push({ title: "Tag the tested commit to release to production", text: "<code>main</code> already deployed D to staging/UAT. After acceptance there, tag the commit. The tag, not the merge, triggers the production deploy.",
+      note: "Roll back by redeploying the previous tag. Never move or delete a pushed tag.",
+      cmd: "git switch main && git pull --ff-only\ngit tag -a v1.4.0 -m \"Release 1.4.0\"\ngit push origin v1.4.0",
+      ops: [{ t: "tag", b: "main", tag: "v1.4.0 → production" }] });
     st.push({ title: "Run many agents at once", text: "Two more agents branch from the new <code>main</code>, each in its own worktree.",
       cmd: "git worktree add -b " + T102 + " ../worktrees/102 origin/main\ngit worktree add -b " + T103 + " ../worktrees/103 origin/main",
       ops: [{ t: "branch", name: T102, from: "main" }, { t: "commit", b: T102, id: "E" }, { t: "branch", name: T103, from: "main" }, { t: "commit", b: T103, id: "G" }] });
     st.push({ title: "Each ticket lands when ready", text: "102 lands as F. 103 rebases onto F, then lands as H. <code>main</code> stays a straight line, one commit per ticket.",
       note: "Short branches make the rebase trivial, so conflict risk stays low.",
-      ops: [{ t: "merge", from: T102, into: "main", id: "F", tag: "deploy", squash: true }, { t: "merge", from: T103, into: "main", id: "H", tag: "deploy", squash: true }, { t: "delete", b: T102 }, { t: "delete", b: T103 }] });
+      ops: [{ t: "merge", from: T102, into: "main", id: "F", tag: "staging/UAT", squash: true }, { t: "merge", from: T103, into: "main", id: "H", tag: "staging/UAT", squash: true }, { t: "delete", b: T102 }, { t: "delete", b: T103 }] });
     return st;
   }
   var trunkRoot = document.getElementById("lab-trunk");
