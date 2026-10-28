@@ -134,6 +134,7 @@ button:disabled { opacity: .4; cursor: default; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 10px 20px; font-size: .78rem; color: var(--muted); border-bottom: 1px solid var(--line); }
 .legend span { display: inline-flex; gap: 6px; align-items: center; }
 .legend svg { width: 26px; height: 10px; }
+.legend span[hidden] { display: none; }
 .stepbody { padding: 22px 20px 8px; display: grid; gap: 12px; min-height: 250px; align-content: start; }
 .kicker { font: 600 .72rem var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
 .stepbody p { max-width: 66ch; }
@@ -383,7 +384,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
   var TICKET_COLORS = ["t1", "t2", "t3"];
 
   function build(ops) {
-    var lanes = [], laneOf = {}, tip = {}, nodes = [], edges = [], tcount = 0, hist = {};
+    var lanes = [], laneOf = {}, tip = {}, nodes = [], edges = [], tcount = 0, hist = {}, pipes = [], runs = [];
     function ensure(name) {
       if (name in laneOf) return;
       var color = name === "main" || name === "production" ? "main" : name === "uat" ? "uat" : name.indexOf("release") === 0 ? "rel" : TICKET_COLORS[tcount++ % 3];
@@ -425,19 +426,27 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
         tip[op.b] = prev;
       } else if (op.t === "tag") {
         tip[op.b].tag = op.tag;
+      } else if (op.t === "pipe") {
+        var pi = -1;
+        pipes.forEach(function (p, k) { if (p.name === op.pipe) pi = k; });
+        if (pi < 0) { pipes.push({ name: op.pipe, color: op.color }); pi = pipes.length - 1; }
+        runs.push({ pipe: pi, src: tip[op.b], label: op.label, step: op.s, color: op.color });
       } else if (op.t === "delete") {
         var l = lanes[laneOf[op.b]]; l.deleted = true; l.note = op.note || "merged";
       }
     });
     nodes.forEach(function (n, i) { n.x = X0 + i * DX; n.y = Y0 + n.lane * DY; });
-    return { lanes: lanes, nodes: nodes, edges: edges };
+    return { lanes: lanes, nodes: nodes, edges: edges, pipes: pipes, runs: runs };
   }
 
   function colorVar(c) { return "var(--c-" + c + ")"; }
 
   function drawGraph(g, current, stage) {
     var lanesEl = stage.querySelector(".lanes"), scroller = stage.querySelector(".scroller");
-    var h = Y0 + (g.lanes.length - 1) * DY + 30;
+    var plLegend = stage.parentNode.querySelector(".pl");
+    if (plLegend) plLegend.hidden = !g.pipes.length;
+    var PY0 = Y0 + (g.lanes.length - 1) * DY + 62, DP = 38;
+    var h = (g.pipes.length ? PY0 + (g.pipes.length - 1) * DP : Y0 + (g.lanes.length - 1) * DY) + 30;
     var w = Math.max(g.nodes.length * DX + X0 + 24, 320);
     var s = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + " " + h + '" role="img" aria-label="Git commit graph">';
     g.lanes.forEach(function (l, i) {
@@ -479,6 +488,23 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       }
       s += "</g>";
     });
+    if (g.pipes.length) {
+      s += '<line x1="0" x2="' + w + '" y1="' + (PY0 - 31) + '" y2="' + (PY0 - 31) + '" stroke="var(--line)"/>';
+      g.pipes.forEach(function (p, k) {
+        var y = PY0 + k * DP;
+        s += '<line x1="0" x2="' + w + '" y1="' + y + '" y2="' + y + '" stroke="var(--line)" stroke-dasharray="2 6"/>';
+      });
+      g.runs.forEach(function (r) {
+        var x = r.src.x, y = PY0 + r.pipe * DP;
+        s += '<line x1="' + x + '" x2="' + x + '" y1="' + (r.src.y + R + 2) + '" y2="' + (y - 10) + '" stroke="' + colorVar(r.color) + '" stroke-width="1.5" stroke-dasharray="3 4"/>';
+      });
+      g.runs.forEach(function (r) {
+        var x = r.src.x, y = PY0 + r.pipe * DP, tw = r.label.length * 5.9 + 16;
+        s += '<g' + (r.step === current ? ' class="fresh"' : "") + '>' +
+          '<rect x="' + (x - tw / 2) + '" y="' + (y - 10) + '" width="' + tw + '" height="20" rx="10" fill="' + colorVar(r.color) + '"/>' +
+          '<text class="pill-t" x="' + x + '" y="' + y + '">' + esc(r.label) + "</text></g>";
+      });
+    }
     g.nodes.forEach(function (n) {
       if (n.step !== current || !n.squashSrc || !n.squashSrc.length) return;
       var tip = n.squashSrc[n.squashSrc.length - 1];
@@ -493,6 +519,8 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
     lanesEl.style.height = h + "px";
     lanesEl.innerHTML = g.lanes.map(function (l, i) {
       return '<div class="lane-label' + (l.deleted ? " done" : "") + '" style="top:' + (Y0 + i * DY - 10) + 'px"><i style="background:' + colorVar(l.color) + '"></i><span title="' + esc(l.name) + '">' + esc(l.name) + "</span>" + (l.deleted ? "<em>✓</em>" : "") + "</div>";
+    }).join("") + g.pipes.map(function (p, k) {
+      return '<div class="lane-label" style="top:' + (PY0 + k * DP - 10) + 'px"><i style="background:' + colorVar(p.color) + '"></i><span title="' + esc(p.name) + '">' + esc(p.name) + "</span></div>";
     }).join("");
     var last = g.nodes.filter(function (n) { return n.step === current; }).pop();
     if (last) scroller.scrollLeft = Math.max(0, last.x - scroller.clientWidth / 2);
@@ -507,7 +535,8 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       '<div class="legend">' +
       '<span><svg viewBox="0 0 26 10"><path d="M0 5H26" stroke="var(--ink)" stroke-width="2.5"/></svg>parent link</span>' +
       '<span><svg viewBox="0 0 26 10"><path d="M0 5H26" stroke="var(--ink)" stroke-width="2.5" stroke-dasharray="6 5"/></svg>squash merge (no parent link)</span>' +
-      '<span><svg viewBox="0 0 26 10"><circle cx="13" cy="5" r="4" fill="var(--bg)" stroke="var(--ink)" stroke-width="2"/></svg>branch created</span></div>' +
+      '<span><svg viewBox="0 0 26 10"><circle cx="13" cy="5" r="4" fill="var(--bg)" stroke="var(--ink)" stroke-width="2"/></svg>branch created</span>' +
+      '<span class="pl" hidden><svg viewBox="0 0 26 10"><rect x="2" y="0" width="22" height="10" rx="5" fill="var(--ink)"/></svg>pipeline run, started by the commit or tag above it</span></div>' +
       '<div class="stepbody"></div>' +
       '<div class="stepnav"><button class="back">Back</button><div class="dots" role="group" aria-label="Steps"></div><button class="primary next">Next step</button></div>';
     var stage = root.querySelector(".stage"), body = root.querySelector(".stepbody");
@@ -548,6 +577,8 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
   /* ---------- trunk steps ---------- */
   var T101 = "ticket/101-login", T102 = "ticket/102-api", T103 = "ticket/103-ui";
   var sync = "rebase";
+  var PIPE_CI = { t: "pipe", b: T101, pipe: "CI", color: "rel", label: "PR checks" };
+  function pipeStaging() { return { t: "pipe", b: "main", pipe: "Staging/UAT", color: "uat", label: "deploy" }; }
   function trunkSteps() {
     var rb = sync === "rebase", st = [];
     st.push({ title: "main is the only long-lived branch", text: "It is always releasable.",
@@ -562,12 +593,12 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       st.push({ title: "Rebase onto main and resolve the conflict", text: "Rebase replays B and C on top of X as B′ and C′. Git stops at the collision and you fix it here, in the branch. The branch then holds only the ticket's changes.",
         cmd: "git fetch origin\ngit rebase origin/main\n# on conflict: fix files, then\ngit add . && git rebase --continue\ngit push --force-with-lease -u origin " + T101,
         note: "Old B and C fade because rebase replaces them. <code>--force-with-lease</code> is required and safe on a branch one agent owns. Then open the PR to <code>main</code>.",
-        ops: [{ t: "rebase", b: T101, onto: "main", ids: ["B′", "C′"], tag: "conflict resolved" }] });
+        ops: [{ t: "rebase", b: T101, onto: "main", ids: ["B′", "C′"], tag: "conflict resolved" }, PIPE_CI] });
     } else {
       st.push({ title: "Merging main into the branch (common mistake)", text: "<code>git merge origin/main</code> adds a merge commit, MM, that brings X and the conflict fix into the ticket branch.",
         cmd: "git fetch origin\ngit merge origin/main\n# on conflict: fix files, then\ngit commit\ngit push -u origin " + T101,
         warn: "The PR now shows changes that are not the ticket's, which makes review harder.",
-        ops: [{ t: "merge", from: "main", into: T101, id: "MM", tag: "merge main", warn: true }] });
+        ops: [{ t: "merge", from: "main", into: T101, id: "MM", tag: "merge main", warn: true }, PIPE_CI] });
     }
     st.push({ title: "CI and review pass, then squash merge", text: rb
         ? "B′ and C′ collapse into one commit, D. The dashed line means D holds the ticket's work without its commits as parents."
@@ -575,7 +606,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
       note: rb ? "The branch already sits on <code>main</code> and the conflict is settled, so the squash applies cleanly." : "",
       warn: rb ? "" : "The squash commit has no link to main's commits, so conflicts can reappear, and follow-up work on this branch collides with <code>main</code> again.",
       cmd: "# In your Git host: Squash and merge the PR into main",
-      ops: [{ t: "merge", from: T101, into: "main", id: "D", tag: rb ? "staging/UAT" : "may conflict", squash: true, warn: !rb }] });
+      ops: [{ t: "merge", from: T101, into: "main", id: "D", tag: rb ? "staging/UAT" : "may conflict", squash: true, warn: !rb }, pipeStaging()] });
     st.push({ title: "Delete the branch and remove the worktree", text: "The branch and folder are removed.",
       warn: "Never commit to this branch again. Follow-ups get a new branch from main.",
       cmd: "git worktree remove ../worktrees/101\ngit branch -D " + T101 + "\ngit push origin --delete " + T101,
@@ -583,13 +614,13 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
     st.push({ title: "Tag the tested commit to release to production", text: "<code>main</code> already deployed D to staging/UAT. After acceptance there, tag the commit. The tag, not the merge, triggers the production deploy.",
       note: "Roll back by redeploying the previous tag. Never move or delete a pushed tag.",
       cmd: "git switch main && git pull --ff-only\ngit tag -a v1.4.0 -m \"Release 1.4.0\"\ngit push origin v1.4.0",
-      ops: [{ t: "tag", b: "main", tag: "v1.4.0 → production" }] });
+      ops: [{ t: "tag", b: "main", tag: "v1.4.0 → production" }, { t: "pipe", b: "main", pipe: "Production", color: "main", label: "deploy v1.4.0" }] });
     st.push({ title: "Run many agents at once", text: "Two more agents branch from the new <code>main</code>, each in its own worktree.",
       cmd: "git worktree add -b " + T102 + " ../worktrees/102 origin/main\ngit worktree add -b " + T103 + " ../worktrees/103 origin/main",
       ops: [{ t: "branch", name: T102, from: "main" }, { t: "commit", b: T102, id: "E" }, { t: "branch", name: T103, from: "main" }, { t: "commit", b: T103, id: "G" }] });
     st.push({ title: "Each ticket lands when ready", text: "102 lands as F. 103 rebases onto F, then lands as H. <code>main</code> stays a straight line, one commit per ticket.",
       note: "Short branches make the rebase trivial, so conflict risk stays low.",
-      ops: [{ t: "merge", from: T102, into: "main", id: "F", tag: "staging/UAT", squash: true }, { t: "merge", from: T103, into: "main", id: "H", tag: "staging/UAT", squash: true }, { t: "delete", b: T102 }, { t: "delete", b: T103 }] });
+      ops: [{ t: "merge", from: T102, into: "main", id: "F", tag: "staging/UAT", squash: true }, pipeStaging(), { t: "merge", from: T103, into: "main", id: "H", tag: "staging/UAT", squash: true }, pipeStaging(), { t: "delete", b: T102 }, { t: "delete", b: T103 }] });
     return st;
   }
   var trunkRoot = document.getElementById("lab-trunk");
