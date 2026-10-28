@@ -425,7 +425,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
         });
         tip[op.b] = prev;
       } else if (op.t === "tag") {
-        tip[op.b].tag = op.tag;
+        tip[op.b].tag = op.tag; tip[op.b].warn = op.warn;
       } else if (op.t === "pipe") {
         var pi = -1;
         pipes.forEach(function (p, k) { if (p.name === op.pipe) pi = k; });
@@ -586,13 +586,16 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
     st.push({ title: "Give the agent a worktree and branch", text: "Branch from the latest <code>main</code>. The agent works only in this folder.",
       cmd: "git worktree add -b " + T101 + " ../worktrees/101 origin/main",
       ops: [{ t: "branch", name: T101, from: "main" }] });
-    st.push({ title: "The agent commits while main moves on", text: "The agent commits B and C. Meanwhile a teammate lands X on <code>main</code>, touching some of the same lines.",
-      note: "<code>main</code> keeps moving even when branches live for hours.",
-      ops: [{ t: "commit", b: T101, id: "B" }, { t: "commit", b: T101, id: "C" }, { t: "commit", b: "main", id: "X", tag: "teammate lands" }] });
+    st.push({ title: "The agent finishes the feature", text: "The agent commits B and C in its worktree and the feature is implemented.",
+      ops: [{ t: "commit", b: T101, id: "B" }, { t: "commit", b: T101, id: "C", tag: "feature done" }] });
+    st.push({ title: "Open the PR and find that main moved on", text: "While the agent worked, a teammate landed X on <code>main</code>, touching some of the same lines. The PR to <code>main</code> shows a conflict and cannot merge yet.",
+      note: "<code>main</code> keeps moving even when branches live for hours. CI does not run on a conflicting PR.",
+      warn: "The branch is behind <code>main</code>. Bring it up to date before review.",
+      ops: [{ t: "commit", b: "main", id: "X", tag: "teammate lands" }, { t: "tag", b: T101, tag: "PR: conflicts", warn: true }] });
     if (rb) {
-      st.push({ title: "Rebase onto main and resolve the conflict", text: "Rebase replays B and C on top of X as B′ and C′. Git stops at the collision and you fix it here, in the branch. The branch then holds only the ticket's changes.",
+      st.push({ title: "Rebase onto main, resolve the conflict and force push", text: "Rebase replays B and C on top of X as B′ and C′. Git stops at the collision and you fix it here, in the branch. The branch then holds only the ticket's changes.",
         cmd: "git fetch origin\ngit rebase origin/main\n# on conflict: fix files, then\ngit add . && git rebase --continue\ngit push --force-with-lease -u origin " + T101,
-        note: "Old B and C fade because rebase replaces them. <code>--force-with-lease</code> is required and safe on a branch one agent owns. Then open the PR to <code>main</code>.",
+        note: "Old B and C fade because rebase replaces them. <code>--force-with-lease</code> is required and safe on a branch one agent owns. The PR updates, the conflict clears and CI runs.",
         ops: [{ t: "rebase", b: T101, onto: "main", ids: ["B′", "C′"], tag: "conflict resolved" }, PIPE_CI] });
     } else {
       st.push({ title: "Merging main into the branch (common mistake)", text: "<code>git merge origin/main</code> adds a merge commit, MM, that brings X and the conflict fix into the ticket branch.",
@@ -628,7 +631,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: .9rem; }
     '<fieldset><legend>Keep the branch current with</legend>' +
     '<label for="s-rb"><input type="radio" name="sync" id="s-rb" value="rebase" checked>Rebase (recommended)</label>' +
     '<label for="s-mg"><input type="radio" name="sync" id="s-mg" value="merge">Merge main in (common mistake)</label></fieldset>' });
-  trunkRoot.querySelector(".lab-top").addEventListener("change", function (e) { sync = e.target.value; trunkLab.reset(3); });
+  trunkRoot.querySelector(".lab-top").addEventListener("change", function (e) { sync = e.target.value; trunkLab.reset(4); });
 
   /* ---------- baseline: merge everywhere ---------- */
   var B1 = "ticket/201-auth", B2 = "ticket/202-report", B3 = "ticket/203-export", PR = "production";
